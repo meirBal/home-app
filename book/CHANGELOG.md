@@ -1,3 +1,7 @@
+## 1.3.0 — 2026-10-09
+- Installs as its own app (own name, icon and home-screen entry) alongside the home-management app
+- previous: v1.2.3 (rollback: APP=book scripts/rollback.sh 1.2.3)
+
 ## 1.2.3 — 2026-10-09
 - New releases show on the next open (no 10-minute browser cache, no mix of old and new files); works offline after first use
 - previous: v1.2.2 (rollback: APP=book scripts/rollback.sh 1.2.2)

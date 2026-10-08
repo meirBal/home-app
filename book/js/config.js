@@ -1,5 +1,5 @@
 // ===== CONFIG — version, page sizes, defaults, font catalog =====
-export const VERSION = '1.2.3';
+export const VERSION = '1.3.0';
 export const SIZES = { A5: [148, 210], A4: [210, 297] }; // mm (width, height)
 
 export const DEFAULTS = {
