@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>עימוד ספר — כתב אשורי</title>
+<link rel="stylesheet" href="css/book.css">
+<script src="vendor/jszip.min.js" defer></script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<!-- ===== TOP BAR ===== -->
+<header class="bar">
+  <h1>עימוד ספר <small id="ver"></small></h1>
+  <label class="btn">📄 בחירת קובץ Word<input id="file" type="file" accept=".docx,.txt" hidden></label>
+  <button id="run" class="primary" disabled>בצע ▶</button>
+  <button id="save" disabled>💾 שמירה / הדפסה</button>
+  <span id="status" role="status"></span>
+</header>
+
+<!-- ===== SETTINGS (every field: data-k = settings key) ===== -->
+<details class="settings" open>
+  <summary>הגדרות עימוד</summary>
+  <div class="grid">
+    <label>גודל דף <select data-k="size"><option>A5</option><option>A4</option></select></label>
+    <label>גודל טקסט עיקרי (pt) <input data-k="bodyPt" type="number" min="8" max="48" step="0.5"></label>
+    <label>מרווח שורות × <input data-k="lineRatio" type="number" min="1.2" max="2.5" step="0.05"></label>
+    <label>רווח בין פסקאות (pt) <input data-k="gapPt" type="number" min="0" max="30" step="0.5"></label>
+    <label>שוליים עליון (מ״מ) <input data-k="mt" type="number" min="8" max="50"></label>
+    <label>שוליים תחתון <input data-k="mb" type="number" min="5" max="50"></label>
+    <label>שוליים פנימי (כריכה) <input data-k="mi" type="number" min="5" max="50"></label>
+    <label>שוליים חיצוני <input data-k="mo" type="number" min="5" max="50"></label>
+    <label>פונט <select data-k="font" id="font"></select></label>
+    <div id="customBox" hidden><label>שם הפונט (כמו בוורד) <input data-k="fontName" placeholder="לדוגמה: Guttman Stam" maxlength="60"></label>
+      <label class="btn small">או העלאת קובץ פונט<input id="fontFile" type="file" accept=".ttf,.otf,.woff,.woff2" hidden></label></div>
+    <label>ניקוד וטעמים <select data-k="marks"><option value="all">להשאיר הכול</option><option value="niqqud">ניקוד בלי טעמים</option><option value="none">בלי ניקוד וטעמים</option></select></label>
+    <label>מספור עמודים <select data-k="numFmt"><option value="heb">אותיות (א, ב…)</option><option value="num">ספרות</option><option value="none">ללא</option></select></label>
+    <label>השלמת עמודים לכפולה של <select data-k="padTo"><option value="1">ללא</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></label>
+    <label>כותרת רצה מכותרות Word <select data-k="headLvl"><option value="1">רמה 1</option><option value="2">רמות 1–2</option><option value="9">כל הרמות</option></select></label>
+    <label class="chk"><input data-k="autoHead" type="checkbox"> כותרת רצה אוטומטית</label>
+    <label class="chk"><input data-k="rule" type="checkbox"> קו תחת הכותרת</label>
+    <label class="chk"><input data-k="breaks" type="checkbox"> לשמור מעברי עמוד מהוורד</label>
+    <label class="chk"><input data-k="empties" type="checkbox"> לשמור שורות ריקות</label>
+  </div>
+  <p id="fontWarn" class="warn" hidden></p>
+</details>
+
+<!-- ===== PANES: original | result ===== -->
+<main class="panes">
+  <section class="pane"><h2>מקור <small id="origInfo"></small></h2><div id="orig" class="orig"><p class="hint">בחרו קובץ Word (‎.docx‎) כדי להתחיל.</p></div></section>
+  <section class="pane"><h2>אחרי עימוד <small id="resInfo"></small>
+    <input id="zoom" type="range" min="0.25" max="1.2" step="0.05" value="0.5" aria-label="זום"></h2>
+    <div id="result" class="book"><p class="hint">לחצו "בצע". לחיצה על עמוד — עריכת כותרת / הוספת עמוד ריק.</p></div></section>
+</main>
+
+<!-- ===== DIALOG: page editor ===== -->
+<dialog id="ed"><form method="dialog">
+  <h3>עמוד <span id="edN"></span></h3>
+  <label>כותרת בצד ימין (פרק / פרשה) <input id="edHead" maxlength="80"></label>
+  <label class="chk"><input id="edFwd" type="checkbox"> להחיל גם על העמודים הבאים (עד הכותרת הבאה)</label>
+  <div class="row"><button type="button" data-a="prev">שכפול מהעמוד הקודם</button><button type="button" data-a="auto">חזרה לאוטומטי</button></div>
+  <div class="row"><button type="button" data-a="blank">➕ עמוד ריק אחרי</button><button type="button" data-a="unblank">➖ הסרת עמוד ריק</button></div>
+  <div class="row end"><button value="cancel">ביטול</button><button value="ok" class="primary">שמירה</button></div>
+</form></dialog>
+
+<!-- ===== DIALOG: save / split ===== -->
+<dialog id="ex"><form method="dialog">
+  <h3>שמירה וחלוקה לקבצים</h3>
+  <label>חלוקה <select id="exMode">
+    <option value="one">קובץ אחד</option><option value="every">כל X עמודים</option>
+    <option value="parts">למספר קבצים שווים</option><option value="ranges">לפי טווחי עמודים</option></select></label>
+  <label id="exSpecBox" hidden><span id="exSpecLbl"></span> <input id="exSpec"></label>
+  <label>שם הקובץ <input id="exName"></label>
+  <p id="exFontWarn" class="warn"></p>
+  <p id="exErr" class="warn"></p>
+  <ol id="exList"></ol>
+  <p class="hint">Word: הפונט חייב להיות מותקן במחשב. הדפסה/PDF: בחלון ההדפסה לבחור "שמירה כ-PDF", שוליים: ללא.</p>
+  <div class="row end"><button value="close">סגירה</button><button type="button" id="exWord" class="primary">הורדת Word</button></div>
+</form></dialog>
+
+<div id="measure" aria-hidden="true"></div>
+<div id="print"></div>
+</body>
+</html>

@@ -19,7 +19,7 @@ self.addEventListener('activate', (e) => e.waitUntil(
 // Same-origin + pinned CDN: cache-first. Supabase API/storage: always network (never cache user data).
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co')) return;
+  if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co') || u.pathname.includes('/book/')) return; // book/ = separate app
   if (u.origin !== location.origin && u.hostname !== 'cdn.jsdelivr.net') return;
   const store = u.origin === location.origin ? CACHE : CDN;
   e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
