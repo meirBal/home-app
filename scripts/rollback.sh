@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 [[ $# -eq 1 ]] || { echo "usage: rollback.sh X.Y.Z"; exit 1; }
 git fetch -q origin
-app="${APP%/}"; ref="origin/release/${app:+$app-}v$1"
+app="${APP:-}"; app="${app%/}"; ref="origin/release/${app:+$app-}v$1"
 git rev-parse -q --verify "$ref" >/dev/null || { echo "no release v$1"; git branch -r | grep release/; exit 1; }
 if [[ -n $app ]]; then scope=("$app" ":!$app/CHANGELOG.md" ":!$app/js/config.js")
 else scope=(. ':!CHANGELOG.md' ':!scripts' ':!sql' ':!js/config.js' ':!book'); fi   # apps never roll each other back

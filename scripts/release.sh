@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 [[ $# -eq 2 && "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'usage: release.sh X.Y.Z "note"'; exit 1; }
-v="$1"; note="$2"; app="${APP%/}"
+v="$1"; note="$2"; app="${APP:-}"; app="${app%/}"
 [[ -z $app || -f $app/js/config.js ]] || { echo "unknown APP=$app"; exit 1; }
 dir=${app:+$app/}; tag="release/${app:+$app-}v$v"; cfg="${dir}js/config.js"; log="${dir}CHANGELOG.md"
 files=("$cfg"); [[ -z $app ]] && files+=(sw.js)
