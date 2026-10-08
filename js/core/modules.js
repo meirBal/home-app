@@ -1,0 +1,78 @@
+// ===== MODULE REGISTRY — every screen is data, so admins can add/edit modules without code =====
+// Field: k=key, l=label, t=type(text|number|money|date|time|select|textarea|check|photo),
+//        o=options, req=required, col=stored in real column (due|amount|done)
+// Module: id, title, icon, fields, view(list|calendar|gallery), sum=show monthly total,
+//         order=column to sort by, asc
+
+const name = { k: 'name', l: 'שם', t: 'text', req: 1 };
+const notes = { k: 'notes', l: 'הערות', t: 'textarea' };
+const due = (l = 'תאריך') => ({ k: 'due', l, t: 'date', col: 'due' });
+const repeat = { k: 'repeat', l: 'חזרה', t: 'select', o: ['יומי', 'שבועי', 'חודשי', 'שנתי'] };
+
+export const DEFAULTS = [
+  { id: 'shopping', title: 'רשימת קניות', icon: '🛒', fields: [name,
+    { k: 'qty', l: 'כמות', t: 'text' },
+    { k: 'when', l: 'מתי', t: 'select', o: ['עכשיו', 'השבוע', 'החודש'] },
+    { k: 'done', l: 'נקנה', t: 'check', col: 'done' }] },
+  { id: 'products', title: 'מוצרים בבית', icon: '📦', fields: [name,
+    { k: 'category', l: 'קטגוריה', t: 'select', o: ['מזון', 'ניקיון', 'טואלטיקה', 'חשמל', 'אחר'] },
+    { k: 'qty', l: 'כמות', t: 'number' },
+    { k: 'status', l: 'מצב', t: 'select', o: ['מלא', 'נמוך', 'נגמר'] },
+    { k: 'photo', l: 'תמונה', t: 'photo' }] },
+  { id: 'expenses', title: 'הוצאות', icon: '💳', sum: true, order: 'due', fields: [
+    { k: 'title', l: 'על מה', t: 'text', req: 1 },
+    { k: 'amount', l: 'סכום', t: 'money', col: 'amount', req: 1 },
+    due(),
+    { k: 'category', l: 'קטגוריה', t: 'select', o: ['קניות שבועיות', 'חשבונות', 'בית', 'רכב', 'אחר'] }] },
+  { id: 'routine', title: 'משימות שגרה', icon: '🔁', order: 'due', asc: true, fields: [
+    { k: 'title', l: 'משימה', t: 'text', req: 1 }, { k: 'who', l: 'אחראי', t: 'text' },
+    repeat, due('הבא בתור'), { k: 'done', l: 'בוצע', t: 'check', col: 'done' }] },
+  { id: 'periodic', title: 'משימות תקופתיות', icon: '🗓️', order: 'due', asc: true, fields: [
+    { k: 'title', l: 'משימה', t: 'text', req: 1 }, due('מועד'),
+    { ...repeat, o: ['חודשי', 'שנתי'] }, notes, { k: 'done', l: 'בוצע', t: 'check', col: 'done' }] },
+  { id: 'calendar', title: 'יומן משותף', icon: '📅', view: 'calendar', order: 'due', asc: true, fields: [
+    { k: 'title', l: 'אירוע', t: 'text', req: 1 }, { ...due(), req: 1 },
+    { k: 'time', l: 'שעה', t: 'time' }, { k: 'who', l: 'מי', t: 'text' }, notes] },
+  { id: 'photos', title: 'תמונות', icon: '🖼️', view: 'gallery', fields: [
+    { k: 'photo', l: 'תמונה', t: 'photo', req: 1 }, { k: 'caption', l: 'כיתוב', t: 'text' }] },
+  { id: 'plans', title: 'תכנון עתידי', icon: '🎯', order: 'due', asc: true, fields: [
+    { k: 'title', l: 'יעד', t: 'text', req: 1 }, due('יעד עד'),
+    { k: 'amount', l: 'תקציב', t: 'money', col: 'amount' }, notes,
+    { k: 'done', l: 'הושג', t: 'check', col: 'done' }] },
+];
+
+// settings.modules = [{id, enabled, title, icon, fields, ...}] — overrides by id + custom modules
+export function resolve(settings = {}) {
+  const ov = new Map((settings.modules || []).map((m) => [m.id, m]));
+  const merged = DEFAULTS.map((d) => ({ ...d, enabled: true, ...ov.get(d.id) }));
+  for (const m of ov.values()) if (!DEFAULTS.some((d) => d.id === m.id)) merged.push({ enabled: true, ...m });
+  return merged;
+}
+
+// Validate admin-edited module JSON before saving (prevents a bad edit from breaking every phone).
+const TYPES = new Set(['text', 'number', 'money', 'date', 'time', 'select', 'textarea', 'check', 'photo']);
+const COLS = new Set(['due', 'amount', 'done']);
+export function validate(m) {
+  if (!/^[a-z][a-z0-9_]{1,30}$/.test(m.id)) throw new Error('מזהה מודול: אותיות אנגלית קטנות בלבד');
+  if (!m.title) throw new Error('חסרה כותרת');
+  if (!Array.isArray(m.fields) || !m.fields.length) throw new Error('חייב לפחות שדה אחד');
+  const keys = new Set();
+  for (const f of m.fields) {
+    if (!f.k || !f.l || !TYPES.has(f.t)) throw new Error(`שדה לא תקין: ${JSON.stringify(f)}`);
+    if (keys.has(f.k)) throw new Error(`שדה כפול: ${f.k}`);
+    if (f.col && !COLS.has(f.col)) throw new Error(`עמודה לא קיימת: ${f.col}`);
+    keys.add(f.k);
+  }
+  return m;
+}
+
+// Repeat → next due date (routine/periodic tasks roll forward instead of closing)
+const STEP = { 'יומי': [0, 1], 'שבועי': [0, 7], 'חודשי': [1, 0], 'שנתי': [12, 0] };
+export function nextDue(dateStr, rep) {
+  const s = STEP[rep];
+  if (!s || !dateStr) return null;
+  const d = new Date(dateStr + 'T00:00');
+  d.setMonth(d.getMonth() + s[0]);
+  d.setDate(d.getDate() + s[1]);
+  return d.toLocaleDateString('sv'); // local YYYY-MM-DD (toISOString would shift a day in UTC+)
+}
