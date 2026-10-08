@@ -1,3 +1,7 @@
+## 1.1.0 — 2026-10-08
+- Smart stock (units/price/expiry/cycles, auto shopping), home dashboard, recipe dice (36 recipes), task starter packs + member assignment, pets & maintenance modules, receipt scanning (AI, needs setup); 29 review fixes; unit + browser smoke tests
+- previous: v1.0.3 (rollback: scripts/rollback.sh 1.0.3)
+
 ## 1.0.3 — 2026-10-08
 - Hosted on GitHub; restore points as release/* branches
 - previous: v1.0.2 (rollback: scripts/rollback.sh 1.0.2)
