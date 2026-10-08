@@ -1,3 +1,7 @@
+## 1.0.3 — 2026-10-08
+- Hosted on GitHub; restore points as release/* branches
+- previous: v1.0.2 (rollback: scripts/rollback.sh 1.0.2)
+
 ## 1.0.2 — 2026-10-08
 - Connected to Supabase (publishable key); DB advisor fixes (002)
 - previous: v1.0.1 (rollback: scripts/rollback.sh 1.0.1)

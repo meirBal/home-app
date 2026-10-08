@@ -1,5 +1,5 @@
 // ===== SERVICE WORKER — offline app shell; cache name tied to VERSION so every release refreshes =====
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 const CACHE = `home-${VERSION}`;
 const CDN = 'cdn-supabase-2.45.4';
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-192.png',
