@@ -1,4 +1,4 @@
-// ===== EXPORT — Word (.docx, one section per page = exact page breaks + per-page header) and print/PDF =====
+// ===== EXPORT — Word (.docx, one section per page = exact page breaks + per-page header/footer), download, browser print =====
 import { esc as X } from './text.js';
 
 const TW = 56.6929;                                     // twips per mm
@@ -21,32 +21,42 @@ function paraXml(p, from, to, s, g, sect) {
   return `<w:p><w:pPr>${pPr}${sect || ''}</w:pPr>${runs}</w:p>`;
 }
 
-// Header: borderless 2-cell table (right cell = title, left cell = page number). Physical sides, no RTL tab guessing.
+// Header: borderless table, cells right→left = right / center / left slot (zero-width slots omitted).
+// Right cell RTL (starts right); center centered; left cell is an LTR paragraph aligned left — physical sides, no RTL guessing.
+const run = (t, g) => (t ? `<w:r><w:rPr><w:sz w:val="${hp(g.hpt)}"/><w:szCs w:val="${hp(g.hpt)}"/></w:rPr><w:t xml:space="preserve">${X(t)}</w:t></w:r>` : '');
+const sp = (g) => `<w:spacing w:before="0" w:after="0" w:line="${ln(g.hline)}" w:lineRule="exact"/>`; // fixed height: tall Stam glyphs can't push the body
+const PPR = { r: (g) => `<w:bidi/>${sp(g)}`, c: (g) => `<w:bidi/>${sp(g)}<w:jc w:val="center"/>`,
+  l: (g) => `<w:bidi w:val="0"/>${sp(g)}<w:jc w:val="left"/>`, rr: (g) => `<w:bidi w:val="0"/>${sp(g)}<w:jc w:val="right"/>` };
+const EMPTY = (tag) => `${HEAD}<w:${tag} ${NS}><w:p/></w:${tag}>`;
+
 function headerXml(pg, s, g, cw) {
-  if (!pg.head && !pg.num) return `${HEAD}<w:hdr ${NS}><w:p/></w:hdr>`;
-  const run = (t) => (t ? `<w:r><w:rPr><w:sz w:val="${hp(g.hpt)}"/><w:szCs w:val="${hp(g.hpt)}"/></w:rPr><w:t xml:space="preserve">${X(t)}</w:t></w:r>` : '');
-  const sp = `<w:spacing w:before="0" w:after="0" w:line="${ln(g.hline)}" w:lineRule="exact"/>`; // fixed height: tall Stam glyphs can't push the body
-  const cell = (w, p) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${p}</w:tc>`;
+  if (!pg.r && !pg.c && !pg.l) return EMPTY('hdr');
+  const cells = ['r', 'c', 'l'].map((k, i) => [k, Math.round(cw * pg.cols[i] / 100)]).filter(([, w]) => w > 0);
   const rule = s.rule ? '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/>' : '';
-  const a = Math.round(cw * 0.8), b = cw - a;
   return `${HEAD}<w:hdr ${NS}><w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${cw}" w:type="dxa"/><w:tblBorders>${rule}</w:tblBorders>` +
     `<w:tblLayout w:type="fixed"/><w:tblCellMar><w:left w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr>` +
-    `<w:tblGrid><w:gridCol w:w="${a}"/><w:gridCol w:w="${b}"/></w:tblGrid><w:tr>` +
-    cell(a, `<w:p><w:pPr><w:bidi/>${sp}</w:pPr>${run(pg.head)}</w:p>`) +
-    cell(b, `<w:p><w:pPr><w:bidi w:val="0"/>${sp}<w:jc w:val="left"/></w:pPr>${run(pg.num)}</w:p>`) +
+    `<w:tblGrid>${cells.map(([, w]) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid><w:tr>` +
+    cells.map(([k, w]) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr><w:p><w:pPr>${PPR[k](g)}</w:pPr>${run(pg[k], g)}</w:p></w:tc>`).join('') +
     `</w:tr></w:tbl><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p></w:hdr>`;
+}
+function footerXml(pg, s, g) {
+  if (!pg.foot) return EMPTY('ftr');
+  const k = { left: 'l', center: 'c', right: 'rr' }[pg.footAlign];
+  return `${HEAD}<w:ftr ${NS}><w:p><w:pPr>${PPR[k](g)}</w:pPr>${run(pg.foot, g)}</w:p></w:ftr>`;
 }
 
 // Word wraps a hair differently than the browser; its bottom margin is one line smaller than ours, so a stray
 // extra line lands in that slack instead of spilling a whole new page (our section breaks fix where pages end).
 export async function buildDocx(pages, paras, s, g) {
   const z = new JSZip();
-  const W = tw(g.pw), H = tw(g.ph), cw = tw(g.pw - s.mi - s.mo), slack = s.bodyPt * s.lineRatio * 0.3528;
+  const W = tw(g.pw), H = tw(g.ph), cw = tw(g.cw), lineMm = s.bodyPt * s.lineRatio * 0.3528;
+  const slack = g.foot ? Math.max(0, Math.min(lineMm, s.mb - g.ftBot - g.hlineMm - 0.5)) : lineMm; // footer must stay inside the margin
   const sect = (pg, k) => {
     const [r, l] = pg.n % 2 ? [s.mi, s.mo] : [s.mo, s.mi];    // odd page = recto; Hebrew binding on its right
-    return `<w:sectPr><w:headerReference w:type="default" r:id="h${k}"/><w:type w:val="nextPage"/><w:pgSz w:w="${W}" w:h="${H}"/>` +
+    const fr = g.foot ? `<w:footerReference w:type="default" r:id="f${k}"/>` : '';
+    return `<w:sectPr><w:headerReference w:type="default" r:id="h${k}"/>${fr}<w:type w:val="nextPage"/><w:pgSz w:w="${W}" w:h="${H}"/>` +
       `<w:pgMar w:top="${tw(s.mt)}" w:right="${tw(r)}" w:bottom="${tw(Math.max(4, s.mb - slack))}" w:left="${tw(l)}" ` +
-      `w:header="${tw(g.hdTop)}" w:footer="0" w:gutter="0"/><w:bidi/></w:sectPr>`;
+      `w:header="${tw(g.hdTop)}" w:footer="${tw(g.ftBot)}" w:gutter="0"/><w:bidi/></w:sectPr>`;
   };
   let body = '', rels = '', types = '';
   pages.forEach((pg, k) => {
@@ -58,6 +68,10 @@ export async function buildDocx(pages, paras, s, g) {
     z.file(`word/header${k}.xml`, headerXml(pg, s, g, cw));
     rels += `<Relationship Id="h${k}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header${k}.xml"/>`;
     types += `<Override PartName="/word/header${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>`;
+    if (!g.foot) return;                                   // every page has its own footer, else Word inherits the previous one
+    z.file(`word/footer${k}.xml`, footerXml(pg, s, g));
+    rels += `<Relationship Id="f${k}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer${k}.xml"/>`;
+    types += `<Override PartName="/word/footer${k}.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>`;
   });
   const f = X(s.fontFamily);
   z.file('[Content_Types].xml', `${HEAD}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>${types}</Types>`);
@@ -75,11 +89,11 @@ export function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 30000);
 }
 
-// Browser print of a page range — vector text with the real font; "Save as PDF" in the print dialog.
-export function printPages(html, vars, g) {
+// Browser print (pages or imposed sheets of wMm × hMm) — vector text with the real font.
+export function printPages(html, vars, wMm, hMm) {
   const box = document.getElementById('print'), book = Object.assign(document.createElement('div'), { className: 'book', innerHTML: html });
   book.style.cssText = vars;                               // never interpolate vars into markup (font name is user text)
-  box.innerHTML = `<style>@page{size:${g.pw}mm ${g.ph}mm;margin:0}</style>`;
+  box.innerHTML = `<style>@page{size:${wMm}mm ${hMm}mm;margin:0}</style>`;
   box.append(book);
   const done = () => { box.textContent = ''; removeEventListener('afterprint', done); };
   addEventListener('afterprint', done);

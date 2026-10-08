@@ -1,0 +1,4 @@
+/* ===== BUNDLED FONTS — free (SIL OFL, see vendor/FrankRuhlLibre-OFL.txt); work offline and inside the APK ===== */
+@font-face { font-family: "Frank Ruhl Libre"; font-weight: 400; font-display: block; src: url(../vendor/frank-ruhl-libre-hebrew-400-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: "Frank Ruhl Libre"; font-weight: 700; font-display: block; src: url(../vendor/frank-ruhl-libre-hebrew-700-normal.woff2) format("woff2"); unicode-range: U+0307-0308, U+0590-05FF, U+200C-2010, U+20AA, U+25CC, U+FB1D-FB4F; }
+@font-face { font-family: "Frank Ruhl Libre"; font-weight: 400; font-display: block; src: url(../vendor/frank-ruhl-libre-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
