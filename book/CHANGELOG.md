@@ -1,3 +1,7 @@
+## 1.2.2 — 2026-10-09
+- Fix: print preview pages slid off-screen on phones (booklet sheets); share button — PDF straight to WhatsApp/any app via the phone's share sheet (desktop: saved for attaching); share-the-app link
+- previous: v1.2.1 (rollback: APP=book scripts/rollback.sh 1.2.1)
+
 ## 1.2.1 — 2026-10-09
 - One booklet limited to 64 pages (thick books → signatures) with clear message; print preview tells which paper size to pick (phones ignore the page size)
 - previous: v1.2.0 (rollback: APP=book scripts/rollback.sh 1.2.0)
