@@ -1,3 +1,7 @@
+## 1.1.2 — 2026-10-09
+- Book-layout app moved to its own repo/address (meirbal.github.io/sefer); /home-app/book/ now redirects there
+- previous: v1.1.1 (rollback: scripts/rollback.sh 1.1.1)
+
 ## 1.1.1 — 2026-10-08
 - Service worker no longer caches the book/ app; release/rollback scripts support APP=book
 - previous: v1.1.0 (rollback: scripts/rollback.sh 1.1.0)
