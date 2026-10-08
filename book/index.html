@@ -20,38 +20,53 @@
   <span id="status" role="status"></span>
 </header>
 
-<!-- ===== SETTINGS (every field: data-k = settings key) ===== -->
+<!-- ===== SETTINGS (every field: data-k = settings key). Basic = what most books need; the rest under "מתקדם" ===== -->
 <details class="settings" id="settings" open>
   <summary>הגדרות עימוד</summary>
   <div class="grid">
     <label>גודל דף <select data-k="size"><option>A5</option><option>A4</option></select></label>
     <label>גודל טקסט עיקרי (pt) <input data-k="bodyPt" type="number" min="8" max="48" step="0.5"></label>
-    <label>מרווח שורות × <input data-k="lineRatio" type="number" min="1.2" max="2.5" step="0.05"></label>
-    <label>רווח בין פסקאות (pt) <input data-k="gapPt" type="number" min="0" max="30" step="0.5"></label>
-    <label>שוליים עליון (מ״מ) <input data-k="mt" type="number" min="8" max="50"></label>
-    <label>שוליים תחתון <input data-k="mb" type="number" min="5" max="50"></label>
-    <label>שוליים פנימי (כריכה) <input data-k="mi" type="number" min="5" max="50"></label>
-    <label>שוליים חיצוני <input data-k="mo" type="number" min="5" max="50"></label>
     <label>פונט <select data-k="font" id="font"></select></label>
     <div id="customBox" hidden><label>שם הפונט (כמו בוורד) <input data-k="fontName" placeholder="לדוגמה: Guttman Stam" maxlength="60"></label></div>
     <label class="btn small">📁 הוספת קובץ פונט (נשמר באפליקציה)<input id="fontFile" type="file" accept=".ttf,.otf,.woff,.woff2" hidden></label>
     <label>ניקוד וטעמים <select data-k="marks"><option value="all">להשאיר הכול</option><option value="niqqud">ניקוד בלי טעמים</option><option value="none">בלי ניקוד וטעמים</option></select></label>
-    <label>מספר עמוד — מיקום <select data-k="numPos"><option value="to">למעלה, בצד החיצוני (מומלץ לספר)</option><option value="tl">למעלה משמאל</option>
+    <label>מספר עמוד <select data-k="numPos"><option value="to">למעלה, בצד החיצוני (מומלץ לספר)</option><option value="tl">למעלה משמאל</option>
       <option value="bo">למטה, בצד החיצוני</option><option value="bc">למטה במרכז</option><option value="bl">למטה משמאל</option><option value="br">למטה מימין</option>
       <option value="none">ללא מספור</option></select></label>
-    <label>המספור מתחיל בעמוד <input data-k="numFrom" type="number" min="1" max="999" title="עמודים לפני כן (שער, הקדמה) יהיו בלי מספר"></label>
-    <label>מספר עמוד — סוג <select data-k="numFmt"><option value="heb">אותיות (א, ב…)</option><option value="num">ספרות (1, 2…)</option></select></label>
-    <label>כותרת מרכזית (בכל העמודים) <input data-k="midText" maxlength="60" placeholder="לדוגמה: שם הספר"></label>
-    <label id="leftBox">טקסט חופשי בצד שמאל <input data-k="leftText" maxlength="60"></label>
-    <label>כותרת רצה מציגה <select data-k="headMode"><option value="last">את הפרק האחרון שבעמוד</option><option value="first">את הפרק שבראש העמוד</option></select></label>
-    <label>השלמת עמודים לכפולה של <select data-k="padTo"><option value="1">ללא</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></label>
-    <label>כותרת רצה מכותרות Word <select data-k="headLvl"><option value="1">רמה 1</option><option value="2">רמות 1–2</option><option value="9">כל הרמות</option></select></label>
-    <label class="chk"><input data-k="autoHead" type="checkbox"> כותרת רצה אוטומטית</label>
-    <label class="chk"><input data-k="rule" type="checkbox"> קו תחת הכותרת</label>
-    <label class="chk"><input data-k="breaks" type="checkbox"> לשמור מעברי עמוד מהוורד</label>
-    <label class="chk"><input data-k="empties" type="checkbox"> לשמור שורות ריקות</label>
-    <label class="chk"><input data-k="widows" type="checkbox"> בלי שורה בודדת בראש/בתחתית עמוד</label>
+    <label class="chk"><input data-k="stretch" type="checkbox"> יישור במתיחת אותיות ם ת ה (כמו בספר תורה; בטקסט בלי ניקוד)</label>
   </div>
+  <details class="adv">
+    <summary>מתקדם</summary>
+    <h4>דף ושורות</h4>
+    <div class="grid">
+      <label>מרווח שורות <select data-k="lineRatio"><option value="1.2">צפוף</option><option value="1.35">רגיל</option><option value="1.5">מרווח</option><option value="1.75">מרווח מאוד</option></select></label>
+      <label>רווח בין פסקאות (pt) <input data-k="gapPt" type="number" min="0" max="30" step="0.5"></label>
+      <label>שוליים עליון (מ״מ) <input data-k="mt" type="number" min="8" max="50"></label>
+      <label>שוליים תחתון <input data-k="mb" type="number" min="5" max="50"></label>
+      <label>שוליים פנימי (כריכה) <input data-k="mi" type="number" min="5" max="50"></label>
+      <label>שוליים חיצוני <input data-k="mo" type="number" min="5" max="50"></label>
+      <label class="chk"><input data-k="widows" type="checkbox"> בלי שורה בודדת בראש/בתחתית עמוד</label>
+      <label class="chk"><input data-k="breaks" type="checkbox"> לשמור מעברי עמוד מהוורד</label>
+      <label class="chk"><input data-k="empties" type="checkbox"> לשמור שורות ריקות</label>
+    </div>
+    <h4>כותרות ומספור</h4>
+    <div class="grid">
+      <label>סוג מספר <select data-k="numFmt"><option value="heb">אותיות (א, ב…)</option><option value="num">ספרות (1, 2…)</option></select></label>
+      <label>המספור מתחיל בעמוד <input data-k="numFrom" type="number" min="1" max="999" title="עמודים לפני כן (שער, הקדמה) יהיו בלי מספר"></label>
+      <label>כותרת מרכזית (בכל העמודים) <input data-k="midText" maxlength="60" placeholder="לדוגמה: שם הספר"></label>
+      <label id="leftBox">טקסט חופשי בצד שמאל <input data-k="leftText" maxlength="60"></label>
+      <label>כותרת רצה מכותרות Word <select data-k="headLvl"><option value="1">רמה 1</option><option value="2">רמות 1–2</option><option value="9">כל הרמות</option></select></label>
+      <label>כותרת רצה מציגה <select data-k="headMode"><option value="last">את הפרק האחרון שבעמוד</option><option value="first">את הפרק שבראש העמוד</option></select></label>
+      <label class="chk"><input data-k="autoHead" type="checkbox"> כותרת רצה אוטומטית</label>
+      <label class="chk"><input data-k="rule" type="checkbox"> קו תחת הכותרת</label>
+      <label>השלמת עמודים לכפולה של <select data-k="padTo"><option value="1">ללא</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></label>
+    </div>
+    <h4>עיטורים (רשות)</h4>
+    <div class="grid">
+      <label class="chk"><input data-k="firstWord" type="checkbox"> הגדלת המילה הראשונה בכל פרק</label>
+      <label>מפריד לפני כל פרק <select data-k="divider"><option value="">ללא</option><option value="✦ ✦ ✦">✦ ✦ ✦</option><option value="❦">❦</option><option value="* * *">* * *</option><option value="———">———</option></select></label>
+    </div>
+  </details>
   <p id="fontWarn" class="warn" hidden></p>
 </details>
 
@@ -109,6 +124,7 @@
   <ol id="exList"></ol>
   <p class="hint" id="impHint">הדפסת חוברת: דו-צדדי, היפוך בצד הקצר, גודל 100% (ללא התאמה לדף), ואז לקפל באמצע. חוברת אחת מתאימה עד כ-48 עמודים — לספר עבה בחרו קונטרסים.</p>
   <p class="hint">Word נשמר תמיד עמוד אחרי עמוד, והפונט חייב להיות מותקן במחשב. לבית דפוס: PDF באיכות "לבית דפוס", או הדפסה ← שמירה כ-PDF (טקסט וקטורי).</p>
+  <div class="row"><button type="button" id="exTest">🧪 דף בדיקה להדפסה דו-צדדית</button></div>
   <div class="row end"><button value="close">סגירה</button><button type="button" id="exWord">הורדת Word</button><button type="button" id="exPdf" class="primary">הורדת PDF</button></div>
 </form></dialog>
 

@@ -17,14 +17,26 @@ export function geom(s, bodySz) {
 }
 
 // Paragraph prep: final-size tokens; line height from the largest run; Word page/section breaks survive dropped empties.
+// Options: firstWord = enlarged opening word (class fw: never stretched) after a
+// chapter heading (line height ignores it, so lines stay even) · divider = ornament paragraph before each chapter.
 export function prepare(doc, s, g) {
   const out = [];
-  let brk = false;
+  let brk = false, opening = false;
   for (const [src, p] of doc.paras.entries()) {
     brk ||= s.breaks && p.brk;
     if (p.empty && !s.empties) continue;
+    const chapter = p.h && p.h <= s.headLvl;
+    if (chapter && s.divider && out.some((q) => !q.h && !q.empty) && !brk) {
+      const tok = [{ t: s.divider, sz: s.bodyPt, b: false }];
+      out.push({ src, tok, h: 0, center: true, brk: false, empty: false, lh: g.line(s.bodyPt * 1.5), orn: true, text: '' });
+    }
     const tok = p.empty ? [] : tokenize(p.runs, s.marks, g.scale);
-    const max = tok.reduce((m, t) => Math.max(m, t.sz), 0) || s.bodyPt;
+    let max = tok.reduce((m, t) => Math.max(m, t.sz), 0) || s.bodyPt;
+    if (s.firstWord && opening && !p.h && !p.center && tok.length) {
+      tok[0] = { ...tok[0], sz: Math.round(tok[0].sz * 2.7) / 2, b: true, fw: true };
+      max = tok.slice(1).reduce((m, t) => Math.max(m, t.sz), tok[0].sz / 1.35);
+    }
+    if (p.h) opening = chapter || opening; else if (!p.empty && !p.center) opening = false; // centered subtitles keep waiting
     out.push({ src, tok, h: p.h, center: p.center, brk, empty: !tok.length, lh: g.line(max),
       text: p.h ? stripMarks(p.runs.map((r) => r.t).join(''), s.marks).replace(/\s+/g, ' ').trim() : '' });
     brk = false;
@@ -37,15 +49,18 @@ export function prepare(doc, s, g) {
 export function fragHTML(p, from, to, cont) {
   if (p.empty) return `<p class="gap" data-s="${p.src}"></p>`;
   let h = '', cur = null, buf = '';
-  const flush = () => { if (buf) h += `<span style="font-size:${cur.sz}pt"${cur.b ? ' class="b"' : ''}>${esc(buf)}</span>`; buf = ''; };
+  const flush = () => {
+    if (buf) { const c = [cur.b && 'b', cur.fw && 'fw'].filter(Boolean).join(' '); h += `<span${c ? ` class="${c}"` : ''} style="font-size:${cur.sz}pt">${esc(buf)}</span>`; }
+    buf = '';
+  };
   for (let i = from; i < to; i++) {
     const t = p.tok[i];
     if (t.br) { flush(); h += '<br>'; continue; }
-    if (!cur || cur.sz !== t.sz || cur.b !== t.b) { flush(); cur = t; }
+    if (!cur || cur.sz !== t.sz || cur.b !== t.b || cur.fw !== t.fw) { flush(); cur = t; }
     buf += t.t;
   }
   flush();
-  return `<p class="f${p.center ? ' c' : ''}${p.h ? ' h' : ''}${cont ? ' k' : ''}" data-s="${p.src}" style="line-height:${p.lh}pt">${h}</p>`;
+  return `<p class="f${p.center ? ' c' : ''}${p.h ? ' h' : ''}${cont ? ' k' : ''}${p.orn ? ' orn' : ''}"${p.orn ? '' : ` data-s="${p.src}"`} style="line-height:${p.lh}pt">${h}</p>`;
 }
 
 // CSS variables for page boxes. Apply ONLY via element.style.cssText (font name is user text).
@@ -77,7 +92,8 @@ async function fill(paras, s, body, onProgress) {
   let cur = [], est = 400, t0 = performance.now();          // est = tokens of one full page, refined as we go
   const flush = async (carryHeads) => {
     const carry = [];                                        // a heading never ends a page: move it to the next
-    while (carryHeads && cur.length > 1 && paras[cur.at(-1).pi].h && !cur.at(-1).cont) carry.unshift(cur.pop());
+    while (carryHeads && cur.length > 1 && (paras[cur.at(-1).pi].h || paras[cur.at(-1).pi].orn) && !cur.at(-1).cont) carry.unshift(cur.pop());
+    while (carry.length && paras[carry[0].pi].orn) carry.shift();   // a divider never opens a page
     while (cur.length && paras[cur.at(-1).pi].empty) cur.pop(); // no trailing gaps
     if (cur.length) pages.push(cur);
     cur = []; body.textContent = '';
@@ -87,6 +103,7 @@ async function fill(paras, s, body, onProgress) {
   for (let pi = 0; pi < paras.length; pi++) {
     const p = paras[pi], n = p.tok.length;
     if (p.brk && cur.length) await flush(false);
+    if (p.orn && !cur.length) continue;                      // nor here
     if (p.empty) { if (cur.length) { const el = add(p, 0, 0); if (fits(el)) cur.push({ pi, from: 0, to: 0 }); else { el.remove(); await flush(true); } } continue; }
     for (let from = 0; from < n;) {
       const tryK = (k) => { const e = add(p, from, k), ok = fits(e); e.remove(); return ok; };
@@ -115,6 +132,7 @@ async function fill(paras, s, body, onProgress) {
       if (best === n) break;
       from = best;
       await flush(true);
+      if (p.orn && !cur.length) break;                       // a divider pushed to a new page is dropped
     }
   }
   await flush(false);
@@ -145,7 +163,8 @@ export function compose(content, paras, s, g, blanks, over) {
   let head = '';
   for (const items of content) {
     const id = startOf(items, paras), heads = items.filter((it) => it.from === 0 && paras[it.pi].h && paras[it.pi].h <= s.headLvl);
-    const top = items[0].from === 0 && heads[0] === items[0] ? paras[heads[0].pi].text : head;  // section in effect at the page top
+    const lead = items.find((it) => !paras[it.pi].orn);
+    const top = lead && lead.from === 0 && heads[0] === lead ? paras[lead.pi].text : head;  // section in effect at the page top
     if (heads.length) head = paras[heads.at(-1).pi].text;
     out.push({ id, items, auto: s.autoHead ? (first ? top : head) : '' });
     for (let k = 0; k < (blanks[id] || 0); k++) out.push({ id: `b${id}#${k}`, blank: true });

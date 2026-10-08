@@ -20,6 +20,15 @@ export function units(pages, mode, sig, render, g) {
     `<div class="sheet">${l == null ? blank : render(pages[l])}${r == null ? blank : render(pages[r])}</div>`) };
 }
 
+// Duplex test sheet: 2 pages (or one imposed sheet front+back) with big numbers, arrows and a frame 5 mm inside the edge.
+export function testUnits(mode, g) {
+  const note = mode === 'none' ? 'בגב של 1 צריך להופיע 2, והחץ באותו כיוון.' : 'בגב: 2 מאחורי 1 ו-3 מאחורי 4, והחצים באותו כיוון. אם לא — לשנות "היפוך בצד הקצר/הארוך".';
+  const page = (n) => `<div class="pw"><div class="page blank" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5mm;text-align:center;font-family:sans-serif;outline:.3mm dashed #000;outline-offset:-5mm">` +
+    `<div style="font-size:30mm;line-height:1">↑</div><div style="font-size:28mm;line-height:1">${n}</div>` +
+    `<div style="font-size:3.5mm;max-width:75%">${note}<br>המסגרת המקווקוות צריכה להיות 5 מ״מ מהקצה — אחרת ההדפסה לא בגודל 100%.</div></div></div>`;
+  return units(mode === 'none' ? [1, 2] : [1, 2, 3, 4], mode === 'none' ? 'none' : 'book', 4, page, g);
+}
+
 // ----- ready PDF: each unit drawn by the browser itself (SVG foreignObject → canvas), so text, niqqud and font are
 // exactly what the preview shows. Drawn in horizontal bands (small canvas: phones, iOS limits) and streamed into
 // Flate as it goes. dpi '600b' = 1-bit black/white at 600 dpi (crisp, small: for print shops); numbers = 8-bit gray. -----
@@ -35,9 +44,9 @@ async function bookCss() {
 const STRIP = 40;                                          // css px under the page, never drawn into the PDF
 async function settle(img, W, H, Hs) {
   const t = Object.assign(document.createElement('canvas'), { width: 64, height: 8 }), c = t.getContext('2d', { willReadFrequently: true });
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 45; i++) {                           // < 3 s: after that font-display:block would show a fallback
     c.fillStyle = '#fff'; c.fillRect(0, 0, 64, 8); c.drawImage(img, 0, H, W, Hs - H, 0, 0, 64, 8);
-    if (c.getImageData(0, 0, 64, 8).data.some((v, j) => j % 4 === 0 && v < 128)) return;
+    if (c.getImageData(0, 0, 64, 8).data.some((v, j) => j % 4 === 0 && v < 235)) return; // any ink (thumbnail averages it to gray)
     await new Promise((r) => setTimeout(r, 60));
   }
   throw new Error('הפונט לא נטען בזמן ליצירת ה-PDF — נסו שוב');
@@ -47,8 +56,7 @@ async function rasterize(html, wMm, hMm, mode, vars, style) {
   const bits = mode === '600b' ? 1 : 8, dpi = parseInt(mode, 10);
   const div = document.createElement('div');
   div.className = 'book';
-  div.style.position = 'relative';
-  div.style.cssText = vars;
+  div.style.cssText = vars + ';position:relative';
   div.innerHTML = `<style>${style}</style>${html}`;
   const fonts = style.includes('@font-face');
   if (fonts) div.insertAdjacentHTML('beforeend', `<div style="position:absolute;top:${hMm}mm;right:0;font:30px var(--font);color:#000">אבג</div>`);
@@ -101,12 +109,13 @@ function pdfFile(imgs, wMm, hMm) {
   return new Blob(parts, { type: 'application/pdf' });
 }
 
-export async function makePdf({ units: list, w, h }, vars, mode, fontCss, onProgress) {
+// prep(html) → html: last-moment per-unit step (letter stretching), so nothing is prepared for all pages at once.
+export async function makePdf({ units: list, w, h }, vars, mode, fontCss, onProgress, prep = (x) => x) {
   if (typeof CompressionStream === 'undefined') throw new Error('הדפדפן לא תומך ביצירת PDF — השתמשו בהדפסה ← שמירה כ-PDF');
   const style = (await bookCss()) + fontCss, imgs = [];
   for (const [i, html] of list.entries()) {
     onProgress?.(i + 1, list.length);
-    imgs.push(await rasterize(html, w, h, String(mode), vars, style));
+    imgs.push(await rasterize(prep(html), w, h, String(mode), vars, style));
   }
   return pdfFile(imgs, w, h);
 }

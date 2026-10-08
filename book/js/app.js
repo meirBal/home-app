@@ -3,7 +3,8 @@ import { VERSION, DEFAULTS, FONTS } from './config.js';
 import { readFile } from './docx-read.js';
 import { geom, prepare, paginate, compose, remap, pageHTML, headHTML, pageVars } from './layout.js';
 import { buildDocx, download, printPages } from './export.js';
-import { units, makePdf, fontCss } from './print.js';
+import { units, makePdf, fontCss, testUnits } from './print.js';
+import { stretchPage, stretchHTML } from './stretch.js';
 import { splitPlan, esc } from './text.js';
 
 const $ = (id) => document.getElementById(id);
@@ -12,10 +13,11 @@ const OVER = () => ({ r: {}, c: {}, l: {}, h: {} });
 const st = { s: load('book.settings', DEFAULTS), doc: null, name: 'ספר', L: null, pages: [], blanks: {}, over: OVER(), busy: 0, undo: null };
 const fonts = load('book.fonts', {});                      // fonts the user added: { family: dataURL }
 const say = (m, err) => { for (const id of ['status', 'pvStatus']) { $(id).textContent = m; $(id).classList.toggle('err', !!err); } };
-const NUMERIC = ['padTo', 'headLvl', 'sig', 'numFrom'];
+const NUMERIC = ['padTo', 'headLvl', 'sig', 'numFrom', 'lineRatio'];
 const HEADER_ONLY = ['midText', 'leftText', 'numFmt', 'numFrom', 'headMode', 'rule', 'autoHead', 'headLvl', 'padTo']; // no re-measuring
 const pickHeader = (s) => Object.fromEntries(HEADER_ONLY.map((k) => [k, s[k]]));
 if (st.s.numFmt === 'none') Object.assign(st.s, { numFmt: 'heb', numPos: 'none' }); // settings saved by v1.0.0
+st.s.lineRatio = [1.2, 1.35, 1.5, 1.75].reduce((a, b) => (Math.abs(b - st.s.lineRatio) < Math.abs(a - st.s.lineRatio) ? b : a)); // v1.1 free values
 
 // ----- [1] SETTINGS: persisted per browser. data-k = layout/header setting, data-o = output-only setting -----
 function load(key, def) { try { return { ...def, ...JSON.parse(localStorage.getItem(key) || '{}') }; } catch { return { ...def }; } }
@@ -157,6 +159,27 @@ async function run() {
   finally { if (id === st.busy) $('run').disabled = false; }
 }
 const render = (pg) => pageHTML(pg, st.L.paras, true);
+// Letter stretching runs per page as it scrolls near the screen (800 pages at once would freeze a phone).
+// One observer per container, dropped when the container is redrawn or closed.
+function lazyStretch(root, L = st.L) {
+  if (!('IntersectionObserver' in window) || !L?.s.stretch) return;
+  root._io ??= new IntersectionObserver((es) => {
+    for (const e of es) if (e.isIntersecting) { root._io.unobserve(e.target); stretchPage(e.target); }
+  }, { rootMargin: '800px' });
+  for (const p of root.querySelectorAll('.page:not([data-st])')) root._io.observe(p);
+}
+const unwatch = (root) => { root._io?.disconnect(); root._io = null; };
+const prepFor = (L, vars) => (L.s.stretch ? (html) => stretchHTML(html, vars, $('measure')) : undefined);
+async function printable(u, L, vars) {           // print needs every unit stretched first: do it in slices, with progress
+  if (!L.s.stretch) return u.units;
+  const out = [];
+  for (const [i, h] of u.units.entries()) {
+    out.push(stretchHTML(h, vars, $('measure')));
+    if (i % 8 === 7) { say(`מכין להדפסה… ${i + 1}/${u.units.length}`); await new Promise((r) => setTimeout(r, 0)); }
+  }
+  say('');
+  return out;
+}
 let zoomTouched = false;
 function draw() {
   const { s, g, paras, content } = st.L;
@@ -164,7 +187,9 @@ function draw() {
   const r = $('result');
   if (!zoomTouched) $('zoom').value = Math.max(0.25, Math.min(1.2, (r.clientWidth - 70) / (g.pw * 3.7795))).toFixed(2); // fit width
   r.style.cssText = pageVars(s, g) + `;--z:${$('zoom').value}`;
+  unwatch(r);
   r.innerHTML = st.pages.map(render).join('');
+  lazyStretch(r);
   const blanks = st.pages.filter((p) => p.blank).length;
   $('resInfo').textContent = `${st.pages.length} עמודים${blanks ? ` (${blanks} ריקים)` : ''} · ${s.size}`;
   $('save').disabled = false;
@@ -178,6 +203,7 @@ function drawHeads() {         // header-only edits: patch headers/footers, keep
     const el = $('result').querySelector(`.page[data-id="${CSS.escape(pg.id)}"]`);
     if (el) el.closest('.pw').outerHTML = render(pg);
   }
+  lazyStretch($('result'));
 }
 $('run').addEventListener('click', run);
 $('zoom').addEventListener('input', (e) => { zoomTouched = true; $('result').style.setProperty('--z', e.target.value); });
@@ -351,7 +377,8 @@ async function saveAll(kind) {
       const name = parts.length > 1 ? `${base} ${String(k + 1).padStart(2, '0')} (${a}-${b}).${kind}` : `${base}.${kind}`;
       say(`יוצר קובץ ${k + 1}/${parts.length}…`);
       const slice = pages.slice(a - 1, b);
-      files.push([name, kind === 'docx' ? await buildDocx(slice, L.paras, L.s, L.g) : await pdf(units(slice, o.imp, o.sig, (pg) => pageHTML(pg, L.paras), L.g), L, o.dpi, k, parts.length)]);
+      files.push([name, kind === 'docx' ? await buildDocx(slice, L.paras, L.s, L.g)
+        : await pdf(units(slice, o.imp, o.sig, (pg) => pageHTML(pg, L.paras), L.g), L, o.dpi, k, parts.length)]);
     }
     if (files.length === 1) download(files[0][1], files[0][0]);
     else { const z = new JSZip(); for (const [n, f] of files) z.file(n, f); download(await z.generateAsync({ type: 'blob', compression: 'STORE' }), `${base}.zip`); }
@@ -370,23 +397,37 @@ async function pdf(u, L, dpi, k = 0, of = 1) {
     try { fontCache[fam] = await fontCss(fam, fontInfo(fam)?.css, fonts[fam]); }
     catch { throw new Error(`לא הצלחתי להטמיע את הפונט "${fam}" ב-PDF (אין אינטרנט?) — נסו שוב, או השתמשו בהדפסה ← שמירה כ-PDF`); }
   }
-  return makePdf(u, pageVars(L.s, L.g), dpi, fontCache[fam], (i, n) => say(`PDF ${of > 1 ? `${k + 1}/${of} · ` : ''}עמוד ${i}/${n}…`));
+  const vars = pageVars(L.s, L.g);
+  return makePdf(u, vars, dpi, fontCache[fam], (i, n) => say(`PDF ${of > 1 ? `${k + 1}/${of} · ` : ''}עמוד ${i}/${n}…`), prepFor(L, vars));
 }
 let pv = null;
 function openPreview(a, b) {
   const L = st.L, o = outOpts(), u = units(st.pages.slice(a - 1, b), o.imp, o.sig, (pg) => pageHTML(pg, L.paras), L.g);
-  pv = { a, b, u, L, vars: pageVars(L.s, L.g) };
-  const z = Math.min(1, (innerWidth - 32) / (u.w * 3.7795));
+  showPreview({ name: `${baseName()} (${a}-${b})`, u, L },
+    `עמודים ${a}–${b} · ${o.imp === 'none' ? `${u.units.length} עמודים` : `${u.units.length / 2} גיליונות דו-צדדיים`}`);
+}
+function showPreview(p, info) {
+  unwatch($('pvBook'));
+  pv = { ...p, vars: pageVars(p.L.s, p.L.g) };
+  const z = Math.min(1, (innerWidth - 32) / (p.u.w * 3.7795));
   $('pvBook').style.cssText = pv.vars + `;--z:${z.toFixed(3)}`;
-  $('pvBook').innerHTML = u.units.join('');
-  $('pvInfo').textContent = `עמודים ${a}–${b} · ${o.imp === 'none' ? `${u.units.length} עמודים` : `${u.units.length / 2} גיליונות דו-צדדיים`}`;
+  $('pvBook').innerHTML = p.u.units.join('');
+  if (!p.test) lazyStretch($('pvBook'), p.L);
+  $('pvInfo').textContent = info;
   $('pv').hidden = false;
 }
-$('pvClose').addEventListener('click', () => { $('pv').hidden = true; $('pvBook').textContent = ''; pv = null; });
-$('pvPrint').addEventListener('click', () => printPages(pv.u.units.join(''), pv.vars, pv.u.w, pv.u.h));
+$('exTest').addEventListener('click', () => {
+  $('ex').close();
+  showPreview({ name: 'דף בדיקה', u: testUnits(st.s.imp, st.L.g), L: st.L, test: true }, 'דף בדיקה — להדפיס דו-צדדי ולהשוות לפני הדפסת הספר');
+});
+$('pvClose').addEventListener('click', () => { unwatch($('pvBook')); $('pv').hidden = true; $('pvBook').textContent = ''; pv = null; });
+$('pvPrint').addEventListener('click', async () => {
+  const p = pv, html = p.test ? p.u.units : await printable(p.u, p.L, p.vars);
+  printPages(html.join(''), p.vars, p.u.w, p.u.h);
+});
 $('pvPdf').addEventListener('click', async () => {
   const p = pv; $('pvPdf').disabled = true;
-  try { download(await pdf(p.u, p.L, st.s.dpi), `${baseName()} (${p.a}-${p.b}).pdf`); say('PDF נשמר'); }
+  try { download(await pdf(p.u, p.test ? { ...p.L, s: { ...p.L.s, stretch: false } } : p.L, st.s.dpi), `${p.name}.pdf`); say('PDF נשמר'); }
   catch (err) { say('שגיאה ב-PDF: ' + err.message, true); console.error(err); }
   finally { $('pvPdf').disabled = false; }
 });

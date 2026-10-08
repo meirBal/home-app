@@ -11,6 +11,7 @@ export const DEFAULTS = {
   midText: '', leftText: '', widows: true,                 // header center / side text; no lone line at a page top/bottom
   imp: 'none', sig: 16, dpi: 300,                          // output only: imposition none | book | sig, pages per signature, PDF dpi
   padTo: 4, breaks: true, empties: true,                   // pad to multiple of N pages; keep Word page breaks / empty lines
+  stretch: false, firstWord: false, divider: '',           // Stam letter stretching · enlarged first word · ornament before each chapter
 };
 
 // css = stylesheet that provides the font (bundled = works offline/APK; Google = needs internet). url = free download for Word.

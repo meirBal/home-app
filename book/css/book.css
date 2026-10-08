@@ -24,6 +24,8 @@ input[type=checkbox] { width: auto; }
 /* ===== SETTINGS ===== */
 .settings { margin: 10px 12px 0; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px 12px; }
 .settings summary { cursor: pointer; font-weight: 600; }
+.adv { margin: 2px 0 6px; } .adv > summary { font-weight: 500; color: var(--acc); }
+.adv h4 { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 14px; padding: 8px 0; }
 .grid label { font-size: 13px; color: var(--muted); }
 .chk { display: flex; gap: 6px; align-items: center; color: var(--fg) !important; }
@@ -70,6 +72,10 @@ input[type=checkbox] { width: auto; }
 .sheet { display: flex; direction: ltr; flex: none; }   /* imposed sheet: two pages side by side, physical left/right */
 .f { margin: 0 0 var(--gap); text-align: justify; overflow-wrap: break-word; }
 .f.k { text-align-last: justify; }
+/* stretched Stam letter: hidden in-flow copy keeps baseline; right/left halves as drawn; middle slice widened */
+.x { display: inline-block; position: relative; } .x i { font-style: normal; } .x0 { visibility: hidden; }
+.xp { position: absolute; top: 0; } .xr { clip-path: inset(-1em 0 -1em 50%); } .xl { clip-path: inset(-1em 50% -1em 0); }
+.xm { clip-path: inset(-1em 45% -1em 45%); transform-origin: 50% 50%; }
 .f.c { text-align: center; }
 .f span { line-height: 0; } /* line box = the paragraph's exact line-height, like Word's lineRule=exact */
 .b { font-weight: 700; }

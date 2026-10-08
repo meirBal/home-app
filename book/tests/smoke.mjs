@@ -166,6 +166,53 @@ await step('bundled free font works offline + embeds in PDF', async () => {
   await d.saveAs(path.join(OUT, 'frank.pdf'));
   await page.click('#pvClose');
 });
+await step('settings split: basic visible, advanced folded', async () => {
+  if (await page.locator('.adv').evaluate((d) => d.open)) throw new Error('advanced open by default');
+  if (!(await page.locator('[data-k="stretch"]').isVisible())) throw new Error('stretch not in basic');
+});
+await step('Stam letter stretching fills lines without moving line breaks', async () => {
+  await pick('marks', 'none');                              // stretch only letters without niqqud
+  await page.waitForFunction(() => !/[\u05B0-\u05BC]/.test(document.querySelector('#result .page .body').textContent), null, { timeout: 15000 });
+  const before = await page.locator('#result .page').count();
+  await page.locator('[data-k="stretch"]').check();
+  await page.waitForFunction(() => document.querySelectorAll('#result .x').length > 3, null, { timeout: 15000 });
+  if ((await page.locator('#result .page').count()) !== before) throw new Error('page count changed');
+  const bad = await page.$$eval('#result .page[data-st] .f.w, #result .page[data-st] .f', (ps) => ps.filter((p) => p.querySelector('.w')).filter((p) => {
+    const ws = [...p.querySelectorAll('.w')], tops = [...new Set(ws.map((w) => w.offsetTop))];
+    if (tops.length < 2) return false;
+    const line = ws.filter((w) => w.offsetTop === tops[0]), gap = Math.min(...line.map((w) => w.offsetLeft)) - p.offsetLeft;
+    return gap > 4;                                         // a full line must reach the left edge
+  }).length);
+  if (bad) throw new Error(`${bad} paragraphs with unfilled first lines`);
+  const named = await page.$$eval('#result .x', (xs) => xs.filter((x) => /אלהי|יהוה/.test(x.closest('.w').textContent.replace(/[^\u05D0-\u05EA]/g, ''))).length);
+  if (named) throw new Error(`${named} stretched letters inside a Divine Name`);
+  const wide = await page.$$eval('#result .x', (xs) => xs.filter((x) => parseFloat(x.style.width) > x.firstChild.offsetWidth * 1.81).length);
+  if (wide) throw new Error(`${wide} letters wider than 1.8×`);
+});
+await step('ornaments: divider before chapters + enlarged first word (optional)', async () => {
+  await page.locator('.adv > summary').click();
+  await page.locator('[data-k="firstWord"]').check();
+  await pick('divider', '❦');
+  await page.waitForFunction(() => document.querySelectorAll('#result .orn').length > 0, null, { timeout: 15000 });
+  const big = await page.$$eval('#result .fw', (s) => s.some((x) => parseFloat(x.style.fontSize) > 17));
+  if (!big) throw new Error('first word not enlarged');
+  const edge = await page.$$eval('#result .page .body', (bs) => bs.filter((b) => b.firstElementChild?.classList.contains('orn') || b.lastElementChild?.classList.contains('orn')).length);
+  if (edge) throw new Error(`${edge} pages start or end with a divider`);
+});
+await step('duplex test sheet in preview', async () => {
+  await page.click('#save'); await page.locator('[data-o="imp"]').selectOption('book');
+  await page.click('#exTest');
+  if ((await page.locator('#pvBook .sheet').count()) !== 2) throw new Error('test sheet');
+  const [d] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#pvPdf')]);
+  await d.saveAs(path.join(OUT, 'test-sheet.pdf'));
+  await page.click('#pvClose');
+});
+await step('PDF with stretched letters', async () => {
+  await page.click('#save'); await page.locator('[data-o="imp"]').selectOption('none'); await page.click('#exList [data-view="0"]');
+  const [d] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#pvPdf')]);
+  await d.saveAs(path.join(OUT, 'stretch.pdf'));
+  await page.click('#pvClose');
+});
 await page.screenshot({ path: path.join(OUT, 'app.png') });
 fs.writeFileSync(path.join(OUT, 'pages.txt'), String(pages));
 await browser.close(); srv.close();
