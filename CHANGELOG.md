@@ -1,3 +1,7 @@
+## 1.0.2 — 2026-10-08
+- Connected to Supabase (publishable key); DB advisor fixes (002)
+- previous: v1.0.1 (rollback: scripts/rollback.sh 1.0.1)
+
 ## 1.0.1 — 2026-10-08
 - Post-review fixes (28 items): reliable updates, old-phone support, thumbnails, security hardening
 - previous: v1.0.0 (rollback: scripts/rollback.sh 1.0.0)
