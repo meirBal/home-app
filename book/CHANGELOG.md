@@ -1,3 +1,7 @@
+## 1.2.0 — 2026-10-09
+- Stam justification by stretching one word-final ם/ת/ה per line (roof only, max 1.8x, Divine Names protected); settings split basic/advanced; duplex test sheet; optional enlarged first word + chapter dividers; review fixes (lazy word wrapping, per-unit PDF stretching, divider never at a page edge, settle cap)
+- previous: v1.1.0 (rollback: APP=book scripts/rollback.sh 1.1.0)
+
 ## 1.1.0 — 2026-10-09
 - Tap text to edit (type/size/bold/center/new page/merge/delete, undo); headers right+center+left; page number top/bottom, outer (mirrored) or fixed side, numbering start, hide per page; running head first/last; no lone lines at page breaks; fix: headings no longer forced onto their own page; print preview; booklet (1+last, 2+last-1…) and signatures; ready PDF (gray or 1-bit 600dpi); bundled free square font; phone tabs + page ⋯ button; 3-role review fixes
 - previous: v1.0.0 (rollback: APP=book scripts/rollback.sh 1.0.0)
