@@ -347,7 +347,8 @@ function plan() {
       if (a % 2 === 0 || (i < parts.length - 1 && (b - a + 1) % unit))
         throw new Error(`לחוברות: כל קובץ צריך להתחיל בעמוד אי-זוגי ולהכיל כפולה של ${unit} עמודים (קובץ ${i + 1}: ${a}–${b})`);
     });
-    if (imp === 'book' && parts.some(([a, b]) => b - a + 1 > 64)) $('exErr').textContent = '⚠ חוברת אחת של יותר מ-64 עמודים לא תתקפל יפה — עדיף קונטרסים.';
+    const big = imp === 'book' && parts.find(([a, b]) => b - a + 1 > 64);  // a fold of >64 pages is not a book
+    if (big) throw new Error(`חוברת אחת מתקפלת עד 64 עמודים (כאן ${big[1] - big[0] + 1}). לספר עבה בחרו "חוברות (קונטרסים)" — כל קונטרס מקופל ונתפר בנפרד.`);
     $('exList').innerHTML = parts.map(([a, b], i) => `<li>עמודים ${a}–${b}${a % 2 ? '' : ' <span class="warn">⚠ מתחיל בעמוד זוגי</span>'}` +
       `<button type="button" data-view="${i}">👁 תצוגת הדפסה</button></li>`).join('');
     return parts;
@@ -414,6 +415,10 @@ function showPreview(p, info) {
   $('pvBook').innerHTML = p.u.units.join('');
   if (!p.test) lazyStretch($('pvBook'), p.L);
   $('pvInfo').textContent = info;
+  // Phones' print dialogs ignore the page size the page asks for — say which paper to pick.
+  const sheet = p.u.w > p.L.g.pw, paper = sheet ? (p.L.s.size === 'A5' ? 'A4 לרוחב' : 'A3 לרוחב') : p.L.s.size;
+  $('pvHint').textContent = `בהדפסה לבחור גודל נייר ${paper}${sheet ? ', דו-צדדי, היפוך בצד הקצר' : ''}, ובגודל 100%.` +
+    (/Android|iPhone|iPad/i.test(navigator.userAgent) ? ' בטלפון עדיף "PDF" ואז להדפיס ממנו.' : '');
   $('pv').hidden = false;
 }
 $('exTest').addEventListener('click', () => {

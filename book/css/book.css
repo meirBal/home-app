@@ -18,7 +18,8 @@ input[type=checkbox] { width: auto; }
 .bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 12px; background: var(--card); border-bottom: 1px solid var(--line); }
 .bar h1 { font-size: 18px; margin: 0 0 0 8px; }
 .bar small, h2 small { color: var(--muted); font-weight: 400; font-size: 12px; }
-#status, #pvStatus { color: var(--muted); font-size: 13px; }
+#status, #pvStatus, #pvHint { color: var(--muted); font-size: 13px; }
+#pvHint { flex-basis: 100%; }
 .err#status, .err#pvStatus { color: #fff; background: #b3261e; padding: 2px 8px; border-radius: 6px; }
 
 /* ===== SETTINGS ===== */

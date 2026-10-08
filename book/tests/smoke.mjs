@@ -147,6 +147,7 @@ await step('booklet preview + ready PDF (imposed sheets)', async () => {
   await page.selectOption('#exMode', 'one');
   await page.locator('[data-o="imp"]').selectOption('book'); await page.locator('[data-o="dpi"]').selectOption('200');
   await page.click('#exList [data-view="0"]');
+  if (!/A4 לרוחב/.test(await page.textContent('#pvHint'))) throw new Error('paper hint');
   const sheets = await page.locator('#pvBook .sheet').count();
   if (sheets !== Math.ceil(pages / 4) * 2) throw new Error(`sheets ${sheets} for ${pages} pages`);
   const first = await page.locator('#pvBook .sheet').first().locator('.page').evaluateAll((ps) => ps.map((p) => p.dataset.id || 'blank'));
