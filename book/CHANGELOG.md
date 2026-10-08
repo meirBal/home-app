@@ -1,3 +1,7 @@
+## 1.2.1 — 2026-10-09
+- One booklet limited to 64 pages (thick books → signatures) with clear message; print preview tells which paper size to pick (phones ignore the page size)
+- previous: v1.2.0 (rollback: APP=book scripts/rollback.sh 1.2.0)
+
 ## 1.2.0 — 2026-10-09
 - Stam justification by stretching one word-final ם/ת/ה per line (roof only, max 1.8x, Divine Names protected); settings split basic/advanced; duplex test sheet; optional enlarged first word + chapter dividers; review fixes (lazy word wrapping, per-unit PDF stretching, divider never at a page edge, settle cap)
 - previous: v1.1.0 (rollback: APP=book scripts/rollback.sh 1.1.0)
