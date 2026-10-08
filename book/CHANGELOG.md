@@ -1,3 +1,7 @@
+## 1.2.3 — 2026-10-09
+- New releases show on the next open (no 10-minute browser cache, no mix of old and new files); works offline after first use
+- previous: v1.2.2 (rollback: APP=book scripts/rollback.sh 1.2.2)
+
 ## 1.2.2 — 2026-10-09
 - Fix: print preview pages slid off-screen on phones (booklet sheets); share button — PDF straight to WhatsApp/any app via the phone's share sheet (desktop: saved for attaching); share-the-app link
 - previous: v1.2.1 (rollback: APP=book scripts/rollback.sh 1.2.1)
