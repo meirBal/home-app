@@ -437,4 +437,32 @@ $('pvPdf').addEventListener('click', async () => {
   finally { $('pvPdf').disabled = false; }
 });
 
+// ----- [10] SHARE: the finished PDF (WhatsApp etc. via the phone's share sheet) and a link to the app -----
+// Phones allow share() only right after a tap; a long PDF outlives that, so the second tap shares the ready file.
+let ready = null;
+async function shareFile(file) {
+  if (!navigator.canShare?.({ files: [file] })) {          // desktop: no file sharing → save it, attach by hand
+    download(file, file.name); say('הקובץ נשמר — צרפו אותו בוואטסאפ'); return true;
+  }
+  try { await navigator.share({ files: [file], title: file.name }); return true; }
+  catch (e) { if (e.name === 'AbortError') return true; if (e.name === 'NotAllowedError') return false; throw e; }
+}
+$('pvShare').addEventListener('click', async () => {
+  const b = $('pvShare'), p = pv;
+  try {
+    if (ready?.p === p) { if (await shareFile(ready.file)) { ready = null; b.textContent = '📤 שיתוף'; } return; }
+    b.disabled = true;
+    const blob = await pdf(p.u, p.test ? { ...p.L, s: { ...p.L.s, stretch: false } } : p.L, st.s.dpi);
+    const file = new File([blob], `${p.name}.pdf`, { type: 'application/pdf' });
+    if (!(await shareFile(file))) { ready = { p, file }; b.textContent = '📤 שתפו עכשיו'; say('ה-PDF מוכן — לחצו "שתפו עכשיו"'); }
+  } catch (err) { say('שגיאה בשיתוף: ' + err.message, true); console.error(err); }
+  finally { b.disabled = false; }
+});
+$('pvClose').addEventListener('click', () => { ready = null; $('pvShare').textContent = '📤 שיתוף'; });
+$('shareApp').addEventListener('click', async () => {
+  const url = location.href.split(/[?#]/)[0], text = 'עימוד ספרי קודש בכתב אשורי — חינם:';
+  try { if (navigator.share) return void (await navigator.share({ title: 'עימוד ספר', text, url })); } catch (e) { if (e.name === 'AbortError') return; }
+  open(`https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`, '_blank', 'noopener');
+});
+
 initForm();

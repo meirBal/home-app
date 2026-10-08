@@ -71,6 +71,7 @@ input[type=checkbox] { width: auto; }
 .hd .m { text-align: center; }
 .hd .l { text-align: left; }
 .sheet { display: flex; direction: ltr; flex: none; }   /* imposed sheet: two pages side by side, physical left/right */
+.sheet > .pw { direction: rtl; }                        /* each page shrinks toward its own right corner, as outside sheets */
 .f { margin: 0 0 var(--gap); text-align: justify; overflow-wrap: break-word; }
 .f.k { text-align-last: justify; }
 /* stretched Stam letter: hidden in-flow copy keeps baseline; right/left halves as drawn; middle slice widened */

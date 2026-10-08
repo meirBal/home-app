@@ -154,6 +154,10 @@ await step('booklet preview + ready PDF (imposed sheets)', async () => {
   if (first.length !== 2) throw new Error('sheet halves');
   const [d] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#pvPdf')]);
   await d.saveAs(path.join(OUT, 'booklet.pdf'));
+  const box = await page.locator('#pvBook .page').first().boundingBox();   // sheets shrink in place, not off-screen
+  if (box.x < 0 || box.x + box.width > 1280) throw new Error('preview page off-screen');
+  const [s] = await Promise.all([page.waitForEvent('download', { timeout: 120000 }), page.click('#pvShare')]); // no share sheet here → file saved
+  if (!/\.pdf$/.test(s.suggestedFilename())) throw new Error('share fallback');
   await page.click('#pvClose');
 });
 await step('bundled free font works offline + embeds in PDF', async () => {
