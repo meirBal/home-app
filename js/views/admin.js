@@ -62,7 +62,7 @@ export async function renderAdmin(root) {
     h('section', { class: 'card' }, h('h2', {}, 'מודולים'),
       ...mods.map((m) => h('div', { class: 'row' },
         h('label', { class: 'inline grow' }, h('input', { type: 'checkbox', checked: m.enabled !== false,
-          onchange: guard((e) => saveModules(mods.map((x) => (x.id === m.id ? { ...x, enabled: e.target.checked } : x)))) }),
+          onchange: guard((e) => saveModules(state.modules.map((x) => (x.id === m.id ? { ...x, enabled: e.target.checked } : x)))) }),
           `${m.icon || ''} ${m.title}`),
         h('button', { class: 'ghost sm', onclick: () => editJson(m, mods) }, 'עריכה'))),
       h('button', { onclick: () => editJson({ id: 'new_list', title: 'רשימה חדשה', icon: '📝',

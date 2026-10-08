@@ -47,7 +47,7 @@ export function fieldInput(f, val) {
     h('option', { value: '' }, '—'), ...(f.o || []).map((o) => h('option', { value: o, selected: o === val }, o)));
   if (f.t === 'textarea') return h('textarea', { name, rows: 3, maxLength: 1000, value: val ?? '' });
   if (f.t === 'check') return h('input', { name, type: 'checkbox', checked: !!val });
-  if (f.t === 'photo') return h('input', { name, type: 'file', accept: 'image/*', capture: 'environment' });
+  if (f.t === 'photo') return h('input', { name, type: 'file', accept: 'image/*' });
   return h('input', {
     name, type: INPUT[f.t] || 'text', required: f.req, value: val ?? '',
     step: f.t === 'money' ? '0.01' : f.t === 'number' ? 'any' : null,
@@ -64,5 +64,10 @@ export function buildForm(fields, rec = {}) {
 // Read one field value from a record (column or jsonb)
 export const valueOf = (rec, f) => (f.col ? rec[f.col] : rec.data?.[f.k]);
 
-export const fmtDate = (d) => d ? new Date(d + 'T00:00').toLocaleDateString('he-IL', { day: 'numeric', month: 'short' }) : '';
-export const fmtMoney = (n) => (+n || 0).toLocaleString('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 0 });
+// Formatters built once (per-row construction is costly on weak phones; min=max digits avoids old-browser RangeError)
+const DATE = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short' });
+const MONEY = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const ISO = new Intl.DateTimeFormat('sv', { timeZone: 'Asia/Jerusalem' });
+export const fmtDate = (d) => (d ? DATE.format(new Date(d + 'T00:00')) : '');
+export const fmtMoney = (n) => MONEY.format(+n || 0);
+export const today = () => ISO.format(new Date());          // YYYY-MM-DD, Israel time

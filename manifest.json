@@ -1,4 +1,5 @@
 {
+  "id": "./",
   "name": "ניהול הבית",
   "short_name": "הבית",
   "lang": "he",
@@ -9,7 +10,8 @@
   "background_color": "#f6f7f8",
   "theme_color": "#0f766e",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

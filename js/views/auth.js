@@ -33,15 +33,18 @@ export function renderLogin(root, done) {
 export function renderOnboard(root, done) {
   const display = h('input', { name: 'display', required: true, maxLength: 40, placeholder: 'השם שלך' });
   const nameIn = h('input', { maxLength: 80, placeholder: 'שם משק הבית' });
-  const codeIn = h('input', { maxLength: 8, placeholder: 'קוד הצטרפות', autocapitalize: 'characters' });
+  const codeIn = h('input', { maxLength: 10, placeholder: 'קוד הצטרפות', autocapitalize: 'characters' });
   const need = () => { if (!display.value.trim()) throw new Error('נא להזין שם'); return display.value; };
   root.replaceChildren(h('main', { class: 'center' }, h('div', { class: 'form card' },
     h('h1', {}, 'ברוכים הבאים'), display,
     h('h3', {}, 'משק בית חדש (תהיה מנהל)'), nameIn,
-    h('button', { onclick: guard(async () => { await house.create(nameIn.value || 'הבית שלנו', need()); done(); }) }, 'יצירה'),
+    h('button', { onclick: guard(async (e) => {
+      e.target.disabled = true;
+      try { await house.create(nameIn.value || 'הבית שלנו', need()); done(); } finally { e.target.disabled = false; }
+    }) }, 'יצירה'),
     h('h3', {}, 'או הצטרפות למשפחה'), codeIn,
     h('button', { class: 'ghost', onclick: guard(async () => {
-      try { await house.join(codeIn.value, need()); } catch (e) { throw new Error(ERR[e.message] || e.message); }
+      await house.join(codeIn.value, need()).catch((e) => { throw new Error(ERR[e.message] || e.message); });
       done();
     }) }, 'הצטרפות'))));
 }

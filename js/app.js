@@ -1,6 +1,6 @@
 // ===== APP SHELL — boot, routing, navigation, realtime, updates =====
 import { h, $, guard, toast } from './core/ui.js';
-import { auth, house, live, sb } from './core/api.js';
+import { auth, house, live, unlive } from './core/api.js';
 import { resolve } from './core/modules.js';
 import { state } from './core/state.js';
 import { renderModule } from './views/module.js';
@@ -8,7 +8,7 @@ import { renderLogin, renderOnboard } from './views/auth.js';
 import { LITE, VERSION } from './config.js';
 
 const app = $('#app');
-if (LITE) document.documentElement.classList.add('lite');   // CSS drops animations/shadows
+if (LITE) document.documentElement.classList.add('lite');   // weak device: lighter CSS
 
 // ---- [Boot: session → household → shell] ----
 async function boot() {
@@ -19,7 +19,24 @@ async function boot() {
   state.house = m.households;
   state.role = m.role;
   state.reload();
-  live(state.house.id, (mod) => { if (!mod || mod === current()) state.refresh(); });
+  live(state.house.id, (mod, delId) => { if (mod ? mod === current() : state.ids?.has(delId)) state.refresh(); });
+}
+
+// Phone woke up: realtime events were missed and admin may have changed settings/role.
+document.addEventListener('visibilitychange', guard(async () => {
+  if (document.hidden || !state.house) return;
+  const m = await house.mine(state.user.id);
+  if (!m) return boot();
+  const changed = JSON.stringify(m.households.settings) !== JSON.stringify(state.house.settings) || m.role !== state.role;
+  state.house = m.households; state.role = m.role;
+  changed ? state.reload() : route();
+}));
+
+async function signOut() {
+  unlive(); state.house = null; state.ids = null;
+  await auth.signOut();
+  history.replaceState(null, '', location.pathname);
+  boot();
 }
 
 state.reload = () => {
@@ -46,6 +63,7 @@ const current = () => location.hash.slice(2) || state.modules.find((m) => m.enab
 let seq = 0;                                     // drop stale renders when user taps fast
 
 const route = guard(async () => {
+  if (!state.house) return;
   const id = current(), my = ++seq;
   nav.querySelectorAll('a').forEach((a) => a.classList.toggle('on', a.dataset.id === id));
   const view = h('div');
@@ -65,24 +83,23 @@ function more(view) {
   view.append(h('header', { class: 'bar' }, h('h1', {}, '☰ עוד')),
     h('section', { class: 'card' },
       h('p', {}, `${state.house.name} · גרסה ${VERSION}`),
-      h('button', { onclick: async () => (await import('./views/admin.js')).requestFeature() }, '💡 בקשת פיצ\'ר'),
-      h('button', { class: 'ghost', onclick: guard(async () => { await auth.signOut(); location.hash = ''; boot(); }) }, 'יציאה')));
+      h('button', { onclick: guard(async () => (await import('./views/admin.js')).requestFeature()) }, '💡 בקשת פיצ\'ר'),
+      h('button', { class: 'ghost', onclick: guard(signOut) }, 'יציאה')));
 }
 
-// ---- [PWA: service worker + "new version" prompt] ----
+// ---- [PWA: service worker; new version applies on tap, checked whenever the app is reopened] ----
 if ('serviceWorker' in navigator) {
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloading) { reloading = true; location.reload(); } });
   navigator.serviceWorker.register('./sw.js').then((reg) => {
+    const offer = (w) => document.body.append(h('button', { class: 'toast', onclick: () => w.postMessage('skip') }, 'גרסה חדשה זמינה — לחץ לעדכון'));
+    if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
     reg.addEventListener('updatefound', () => {
       const w = reg.installing;
-      w?.addEventListener('statechange', () => {
-        if (w.state === 'installed' && navigator.serviceWorker.controller) {
-          const t = h('button', { class: 'toast', onclick: () => location.reload() }, 'גרסה חדשה זמינה — לחץ לרענון');
-          document.body.append(t);
-        }
-      });
+      w?.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) offer(w); });
     });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
   });
 }
 
-sb.auth.onAuthStateChange((e) => { if (e === 'SIGNED_OUT') state.user = null; });
 boot().catch((e) => { console.error(e); toast('אין חיבור לשרת', true); });

@@ -7,8 +7,8 @@
 create table if not exists public.households (
   id          uuid primary key default gen_random_uuid(),
   name        text not null check (length(name) between 1 and 80),
-  invite_code text unique not null default upper(substr(md5(gen_random_uuid()::text), 1, 8)),
-  settings    jsonb not null default '{}',          -- admin config: modules, fields
+  invite_code text unique not null default upper(substr(md5(gen_random_uuid()::text), 1, 10)),
+  settings    jsonb not null default '{}' check (pg_column_size(settings) < 65536), -- admin config
   created_at  timestamptz not null default now()
 );
 
@@ -19,7 +19,7 @@ create table if not exists public.members (
   display_name text check (length(display_name) <= 40),
   primary key (household_id, user_id)
 );
-create index if not exists members_user_idx on public.members (user_id);
+create unique index if not exists members_one_house on public.members (user_id); -- one household per user
 
 -- One generic table for every module (built-in + admin-defined).
 -- Frequently filtered/summed fields are real columns; the rest live in data.
@@ -36,7 +36,7 @@ create table if not exists public.records (
   updated_at   timestamptz not null default now()
 );
 create index if not exists records_list_idx on public.records (household_id, module, created_at desc);
-create index if not exists records_due_idx  on public.records (household_id, due) where due is not null;
+create index if not exists records_due_idx  on public.records (household_id, module, due);
 
 create table if not exists public.feature_requests (
   id           bigint generated always as identity primary key,
@@ -67,14 +67,24 @@ drop trigger if exists records_touch on public.records;
 create trigger records_touch before update on public.records
   for each row execute function public.touch_updated_at();
 
+-- created_by cannot be spoofed.
+create or replace function public.stamp_creator() returns trigger
+language plpgsql set search_path = public as $$
+begin new.created_by := auth.uid(); return new; end $$;
+
+drop trigger if exists records_stamp on public.records;
+create trigger records_stamp before insert on public.records for each row execute function public.stamp_creator();
+drop trigger if exists fr_stamp on public.feature_requests;
+create trigger fr_stamp before insert on public.feature_requests for each row execute function public.stamp_creator();
+
 -- Never leave a household without an admin.
 create or replace function public.guard_last_admin() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql set search_path = public as $$
 begin
   if old.role = 'admin' and (tg_op = 'DELETE' or new.role <> 'admin')
      and not exists (select 1 from members where household_id = old.household_id
                      and role = 'admin' and user_id <> old.user_id)
-     and exists (select 1 from households where id = old.household_id) then
+     and exists (select 1 from members where household_id = old.household_id and user_id <> old.user_id) then
     raise exception 'last admin cannot be removed or demoted';
   end if;
   return coalesce(new, old);
@@ -112,7 +122,7 @@ language plpgsql security definer set search_path = public as $$
 declare c text;
 begin
   if not is_admin(h) then raise exception 'admin only'; end if;
-  update households set invite_code = upper(substr(md5(gen_random_uuid()::text), 1, 8))
+  update households set invite_code = upper(substr(md5(gen_random_uuid()::text), 1, 10))
     where id = h returning invite_code into c;
   return c;
 end $$;
@@ -128,32 +138,47 @@ alter table public.members          enable row level security;
 alter table public.records          enable row level security;
 alter table public.feature_requests enable row level security;
 
-create policy hh_read   on public.households for select using (is_member(id));
-create policy hh_admin  on public.households for update using (is_admin(id)) with check (is_admin(id));
+drop policy if exists hh_read on public.households;
+create policy hh_read on public.households for select to authenticated using (is_member(id));
+drop policy if exists hh_admin on public.households;
+create policy hh_admin on public.households for update to authenticated using (is_admin(id)) with check (is_admin(id));
 
-create policy mb_read   on public.members for select using (is_member(household_id));
-create policy mb_admin  on public.members for update using (is_admin(household_id)) with check (is_admin(household_id));
-create policy mb_remove on public.members for delete using (is_admin(household_id) or user_id = auth.uid());
+drop policy if exists mb_read on public.members;
+create policy mb_read on public.members for select to authenticated using (is_member(household_id));
+drop policy if exists mb_admin on public.members;
+create policy mb_admin on public.members for update to authenticated using (is_admin(household_id)) with check (is_admin(household_id));
+drop policy if exists mb_remove on public.members;
+create policy mb_remove on public.members for delete to authenticated using (is_admin(household_id) or user_id = auth.uid());
 
-create policy rc_all on public.records for all
+drop policy if exists rc_all on public.records;
+create policy rc_all on public.records for all to authenticated
   using (is_member(household_id)) with check (is_member(household_id));
 
-create policy fr_read   on public.feature_requests for select using (is_member(household_id));
-create policy fr_add    on public.feature_requests for insert with check (is_member(household_id));
-create policy fr_admin  on public.feature_requests for update using (is_admin(household_id));
-create policy fr_del    on public.feature_requests for delete using (is_admin(household_id));
+drop policy if exists fr_read on public.feature_requests;
+create policy fr_read on public.feature_requests for select to authenticated using (is_member(household_id));
+drop policy if exists fr_add on public.feature_requests;
+create policy fr_add on public.feature_requests for insert to authenticated with check (is_member(household_id) and status = 'new');
+drop policy if exists fr_admin on public.feature_requests;
+create policy fr_admin on public.feature_requests for update to authenticated using (is_admin(household_id));
+drop policy if exists fr_del on public.feature_requests;
+create policy fr_del on public.feature_requests for delete to authenticated using (is_admin(household_id));
 
 -- ===== [5] PHOTO STORAGE (private, 2MB, path = <household_id>/<file>) ==
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('photos', 'photos', false, 2097152, array['image/jpeg','image/webp'])
 on conflict (id) do nothing;
 
-create policy ph_read on storage.objects for select
+drop policy if exists ph_read on storage.objects;
+create policy ph_read on storage.objects for select to authenticated
   using (bucket_id = 'photos' and public.is_member(((storage.foldername(name))[1])::uuid));
-create policy ph_add on storage.objects for insert
+drop policy if exists ph_add on storage.objects;
+create policy ph_add on storage.objects for insert to authenticated
   with check (bucket_id = 'photos' and public.is_member(((storage.foldername(name))[1])::uuid));
-create policy ph_del on storage.objects for delete
+drop policy if exists ph_del on storage.objects;
+create policy ph_del on storage.objects for delete to authenticated
   using (bucket_id = 'photos' and public.is_member(((storage.foldername(name))[1])::uuid));
 
 -- ===== [6] REALTIME (live sync between phones) ========================
-alter publication supabase_realtime add table public.records;
+do $$ begin
+  alter publication supabase_realtime add table public.records;
+exception when duplicate_object then null; end $$;

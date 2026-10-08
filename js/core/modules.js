@@ -22,7 +22,7 @@ export const DEFAULTS = [
   { id: 'expenses', title: 'הוצאות', icon: '💳', sum: true, order: 'due', fields: [
     { k: 'title', l: 'על מה', t: 'text', req: 1 },
     { k: 'amount', l: 'סכום', t: 'money', col: 'amount', req: 1 },
-    due(),
+    { ...due(), req: 1 },
     { k: 'category', l: 'קטגוריה', t: 'select', o: ['קניות שבועיות', 'חשבונות', 'בית', 'רכב', 'אחר'] }] },
   { id: 'routine', title: 'משימות שגרה', icon: '🔁', order: 'due', asc: true, fields: [
     { k: 'title', l: 'משימה', t: 'text', req: 1 }, { k: 'who', l: 'אחראי', t: 'text' },
@@ -51,28 +51,39 @@ export function resolve(settings = {}) {
 
 // Validate admin-edited module JSON before saving (prevents a bad edit from breaking every phone).
 const TYPES = new Set(['text', 'number', 'money', 'date', 'time', 'select', 'textarea', 'check', 'photo']);
+const LISTABLE = new Set(['text', 'number', 'money', 'date', 'time', 'select']);
 const COLS = new Set(['due', 'amount', 'done']);
+const ORDERS = new Set(['created_at', 'due', 'amount']);
+const RESERVED = new Set(['length', 'item', 'namedItem']);
 export function validate(m) {
-  if (!/^[a-z][a-z0-9_]{1,30}$/.test(m.id)) throw new Error('מזהה מודול: אותיות אנגלית קטנות בלבד');
-  if (!m.title) throw new Error('חסרה כותרת');
-  if (!Array.isArray(m.fields) || !m.fields.length) throw new Error('חייב לפחות שדה אחד');
+  const err = (t) => { throw new Error(t); };
+  if (!/^[a-z][a-z0-9_]{1,30}$/.test(m.id)) err('מזהה מודול: אותיות אנגלית קטנות בלבד');
+  if (!m.title) err('חסרה כותרת');
+  if (m.order && !ORDERS.has(m.order)) err('order: created_at / due / amount');
+  if (!Array.isArray(m.fields) || !m.fields.some((f) => LISTABLE.has(f.t) && !f.col)) err('חייב שדה טקסט/מספר/בחירה אחד לפחות');
   const keys = new Set();
   for (const f of m.fields) {
-    if (!f.k || !f.l || !TYPES.has(f.t)) throw new Error(`שדה לא תקין: ${JSON.stringify(f)}`);
-    if (keys.has(f.k)) throw new Error(`שדה כפול: ${f.k}`);
-    if (f.col && !COLS.has(f.col)) throw new Error(`עמודה לא קיימת: ${f.col}`);
+    if (!/^[a-z][a-z0-9_]{0,30}$/.test(f.k) || RESERVED.has(f.k) || !f.l || !TYPES.has(f.t)) err(`שדה לא תקין: ${JSON.stringify(f)}`);
+    if (keys.has(f.k)) err(`שדה כפול: ${f.k}`);
+    if (f.col && !COLS.has(f.col)) err(`עמודה לא קיימת: ${f.col}`);
     keys.add(f.k);
   }
   return m;
 }
 
-// Repeat → next due date (routine/periodic tasks roll forward instead of closing)
+// Repeat → next due date strictly after today; month math clamps (Jan 31 → Feb 28/29).
 const STEP = { 'יומי': [0, 1], 'שבועי': [0, 7], 'חודשי': [1, 0], 'שנתי': [12, 0] };
-export function nextDue(dateStr, rep) {
+export function nextDue(dateStr, rep, todayStr) {
   const s = STEP[rep];
-  if (!s || !dateStr) return null;
-  const d = new Date(dateStr + 'T00:00');
-  d.setMonth(d.getMonth() + s[0]);
-  d.setDate(d.getDate() + s[1]);
-  return d.toLocaleDateString('sv'); // local YYYY-MM-DD (toISOString would shift a day in UTC+)
+  if (!s) return null;
+  const [y, m, d] = (dateStr || todayStr).split('-').map(Number);
+  let n = 0, out;
+  do {
+    n++;
+    const t = new Date(y, m - 1 + s[0] * n, 1);
+    const dim = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+    t.setDate(Math.min(d, dim) + s[1] * n);
+    out = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+  } while (out <= todayStr && n < 1000);
+  return out;
 }
