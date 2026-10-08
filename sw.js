@@ -4,7 +4,8 @@ const CACHE = `home-${VERSION}`;
 const CDN = 'cdn-supabase-2.45.4';
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-192.png',
   'js/app.js', 'js/config.js', 'js/core/api.js', 'js/core/ui.js', 'js/core/modules.js', 'js/core/state.js',
-  'js/views/module.js', 'js/views/auth.js', 'js/views/admin.js'];
+  'js/core/smart.js', 'js/data/recipes.js', 'js/data/seeds.js',
+  'js/views/module.js', 'js/views/home.js', 'js/views/dice.js', 'js/views/receipt.js', 'js/views/auth.js', 'js/views/admin.js'];
 
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))));
 

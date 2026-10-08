@@ -10,6 +10,13 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 | `js/core/modules.js` | הגדרת המודולים כנתונים + אימות + חזרתיות משימות |
 | `js/core/ui.js` | DOM, טפסים מסכמה, חלונות, הודעות |
 | `js/core/state.js` | מצב משותף |
+| `js/core/smart.js` | מנוע חכם: התאמת שמות בעברית, ניחוש מחזור/קטגוריה, מלאי ↔ קניות, השלמת משימות |
+| `js/data/recipes.js` · `seeds.js` | מאגר מתכונים מובנה · חבילות משימות מומלצות |
+| `js/views/home.js` | מסך בית: היום ומחר, תוקף, כדאי לקנות, חבילות התחלה |
+| `js/views/dice.js` | 🎲🎲 מתכון לפי ארוחה × רעב × מה שיש בבית |
+| `js/views/receipt.js` | סריקת קבלה → אישור → מלאי/קניות/הוצאה |
+| `supabase/functions/receipt` | Edge Function: קבלה → פריטים (Gemini, מכסה יומית למשק בית) |
+| `tests/` | `node tests/smart.test.mjs` · `node tests/smoke.mjs .` (דפדפן + שרת מדומה) |
 | `js/views/module.js` | תצוגה גנרית: רשימה / יומן / גלריה |
 | `js/views/admin.js` | ממשק ניהול: מודולים, משתמשים, הזמנה, בקשות פיצ'רים |
 | `js/views/auth.js` | כניסה, הרשמה, יצירה/הצטרפות למשק בית |
@@ -23,6 +30,11 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 3. Supabase → Project Settings → API Keys → להעתיק את ה-**Publishable / anon** ל-`js/config.js`.
 4. GitHub → `meirBal/home-app` → Settings → Pages → Branch `main` / root (חד-פעמי).
 5. בטלפון: לפתוח `https://meirbal.github.io/home-app/` → "הוספה למסך הבית".
+
+## הפעלת סריקת קבלות (חד-פעמי, חינם)
+1. aistudio.google.com → Get API key → Create API key.
+2. Supabase → Edge Functions → Secrets → `GEMINI_API_KEY` = המפתח.
+3. להריץ את `sql/002_smart.sql` ב-SQL Editor ולפרוס את `supabase/functions/receipt` (Claude עושה זאת דרך ה-connector).
 
 ## גרסאות
 - שחרור: `scripts/release.sh 1.1.0 "מה השתנה"` — מעדכן גרסה ו-CHANGELOG, מעלה ל-main ושומר ענף `release/vX.Y.Z` כנקודת שחזור.

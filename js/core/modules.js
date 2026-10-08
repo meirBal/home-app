@@ -1,56 +1,75 @@
 // ===== MODULE REGISTRY — every screen is data, so admins can add/edit modules without code =====
-// Field: k=key, l=label, t=type(text|number|money|date|time|select|textarea|check|photo),
+// Field: k=key, l=label, t=type(text|number|money|date|time|select|textarea|check|photo|member),
 //        o=options, req=required, col=stored in real column (due|amount|done)
-// Module: id, title, icon, fields, view(list|calendar|gallery), sum=show monthly total,
+// Module: id, title, icon, pin, fields, view(list|calendar|gallery), sum=show monthly total,
 //         order=column to sort by, asc
 
 const name = { k: 'name', l: 'שם', t: 'text', req: 1 };
+const title = (l = 'משימה') => ({ k: 'title', l, t: 'text', req: 1 });
 const notes = { k: 'notes', l: 'הערות', t: 'textarea' };
 const due = (l = 'תאריך') => ({ k: 'due', l, t: 'date', col: 'due' });
-const repeat = { k: 'repeat', l: 'חזרה', t: 'select', o: ['יומי', 'שבועי', 'חודשי', 'שנתי'] };
+const who = (l = 'אחראי') => ({ k: 'who', l, t: 'member' });
+const done = (l = 'בוצע') => ({ k: 'done', l, t: 'check', col: 'done' });
+const photo = { k: 'photo', l: 'תמונה', t: 'photo' };
+export const REPEATS = ['יומי', 'שבועי', 'דו-שבועי', 'חודשי', 'דו-חודשי', 'רבעוני', 'חצי שנתי', 'שנתי'];
+const repeat = { k: 'repeat', l: 'חזרה', t: 'select', o: REPEATS };
+export const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'מ״ל', 'אריזה'];
+const qty = [{ k: 'qty', l: 'כמות', t: 'number' }, { k: 'unit', l: 'יחידה', t: 'select', o: UNITS }];
+export const CATEGORIES = ['ירקות ופירות', 'מוצרי חלב', 'בשר ודגים', 'מאפים', 'יבשים ושימורים', 'קפואים',
+  'משקאות', 'ניקיון', 'טואלטיקה', 'תינוקות', 'בעלי חיים', 'אחר'];
+export const CYCLES = ['ללא', 'כל 3 ימים', 'כל שבוע', 'כל שבועיים', 'כל חודש', 'כל חודשיים', 'כל 3 חודשים'];
+export const TASK_MODULES = ['routine', 'periodic', 'maintenance', 'pets'];
 
+// pin = shown in the bottom bar on phones (everything is always reachable via "עוד")
 export const DEFAULTS = [
-  { id: 'shopping', title: 'רשימת קניות', icon: '🛒', fields: [name,
-    { k: 'qty', l: 'כמות', t: 'text' },
+  { id: 'shopping', title: 'רשימת קניות', icon: '🛒', pin: true, fields: [name, ...qty,
     { k: 'when', l: 'מתי', t: 'select', o: ['עכשיו', 'השבוע', 'החודש'] },
-    { k: 'done', l: 'נקנה', t: 'check', col: 'done' }] },
-  { id: 'products', title: 'מוצרים בבית', icon: '📦', fields: [name,
-    { k: 'category', l: 'קטגוריה', t: 'select', o: ['מזון', 'ניקיון', 'טואלטיקה', 'חשמל', 'אחר'] },
-    { k: 'qty', l: 'כמות', t: 'number' },
+    { k: 'amount', l: 'מחיר', t: 'money', col: 'amount' }, photo, done('נקנה')] },
+  { id: 'products', title: 'מוצרים בבית', icon: '📦', pin: true, order: 'due', asc: true, fields: [name,
+    { k: 'category', l: 'קטגוריה', t: 'select', o: CATEGORIES }, ...qty,
     { k: 'status', l: 'מצב', t: 'select', o: ['מלא', 'נמוך', 'נגמר'] },
-    { k: 'photo', l: 'תמונה', t: 'photo' }] },
+    due('תוקף'), { k: 'cycle', l: 'נגמר בדרך כלל', t: 'select', o: CYCLES },
+    { k: 'bought', l: 'נקנה לאחרונה', t: 'date' },
+    { k: 'amount', l: 'מחיר', t: 'money', col: 'amount' }, photo] },
+  { id: 'routine', title: 'משימות שגרה', icon: '🔁', pin: true, order: 'due', asc: true, fields: [
+    title(), who(), repeat, due('הבא בתור'), done()] },
+  { id: 'calendar', title: 'יומן משותף', icon: '📅', pin: true, view: 'calendar', order: 'due', asc: true, fields: [
+    title('אירוע'), { ...due(), req: 1 }, { k: 'time', l: 'שעה', t: 'time' }, who('מי'), notes] },
   { id: 'expenses', title: 'הוצאות', icon: '💳', sum: true, order: 'due', fields: [
-    { k: 'title', l: 'על מה', t: 'text', req: 1 },
-    { k: 'amount', l: 'סכום', t: 'money', col: 'amount', req: 1 },
-    { ...due(), req: 1 },
-    { k: 'category', l: 'קטגוריה', t: 'select', o: ['קניות שבועיות', 'חשבונות', 'בית', 'רכב', 'אחר'] }] },
-  { id: 'routine', title: 'משימות שגרה', icon: '🔁', order: 'due', asc: true, fields: [
-    { k: 'title', l: 'משימה', t: 'text', req: 1 }, { k: 'who', l: 'אחראי', t: 'text' },
-    repeat, due('הבא בתור'), { k: 'done', l: 'בוצע', t: 'check', col: 'done' }] },
+    title('על מה'), { k: 'amount', l: 'סכום', t: 'money', col: 'amount', req: 1 }, { ...due(), req: 1 },
+    { k: 'category', l: 'קטגוריה', t: 'select', o: ['קניות שבועיות', 'חשבונות', 'בית', 'רכב', 'בעלי חיים', 'אחר'] }] },
   { id: 'periodic', title: 'משימות תקופתיות', icon: '🗓️', order: 'due', asc: true, fields: [
-    { k: 'title', l: 'משימה', t: 'text', req: 1 }, due('מועד'),
-    { ...repeat, o: ['חודשי', 'שנתי'] }, notes, { k: 'done', l: 'בוצע', t: 'check', col: 'done' }] },
-  { id: 'calendar', title: 'יומן משותף', icon: '📅', view: 'calendar', order: 'due', asc: true, fields: [
-    { k: 'title', l: 'אירוע', t: 'text', req: 1 }, { ...due(), req: 1 },
-    { k: 'time', l: 'שעה', t: 'time' }, { k: 'who', l: 'מי', t: 'text' }, notes] },
+    title(), who(), due('מועד'), repeat, notes, done()] },
+  { id: 'maintenance', title: 'תחזוקת הבית', icon: '🔧', order: 'due', asc: true, fields: [
+    title(), { k: 'area', l: 'מכשיר / אזור', t: 'text' }, who(), repeat, due('מועד'), notes, done()] },
+  { id: 'pets', title: 'בעלי חיים', icon: '🐾', order: 'due', asc: true, fields: [
+    title(), { k: 'pet', l: 'שם החיה', t: 'text' }, who(), repeat, due('מועד'), notes, done()] },
+  { id: 'recipes', title: 'המתכונים שלנו', icon: '🍳', fields: [name,
+    { k: 'meal', l: 'ארוחה', t: 'select', o: ['בוקר', 'צהריים', 'ערב'] },
+    { k: 'mood', l: 'מצב רעב', t: 'select', o: ['קליל', 'רעב', 'רעב מאוד'] },
+    { k: 'minutes', l: 'דקות הכנה', t: 'number' },
+    { k: 'ing', l: 'מצרכים (שורה לכל מצרך)', t: 'textarea' }, { k: 'steps', l: 'אופן הכנה', t: 'textarea' }, photo] },
   { id: 'photos', title: 'תמונות', icon: '🖼️', view: 'gallery', fields: [
-    { k: 'photo', l: 'תמונה', t: 'photo', req: 1 }, { k: 'caption', l: 'כיתוב', t: 'text' }] },
+    { ...photo, req: 1 }, { k: 'caption', l: 'כיתוב', t: 'text' }] },
   { id: 'plans', title: 'תכנון עתידי', icon: '🎯', order: 'due', asc: true, fields: [
-    { k: 'title', l: 'יעד', t: 'text', req: 1 }, due('יעד עד'),
-    { k: 'amount', l: 'תקציב', t: 'money', col: 'amount' }, notes,
-    { k: 'done', l: 'הושג', t: 'check', col: 'done' }] },
+    title('יעד'), due('יעד עד'), { k: 'amount', l: 'תקציב', t: 'money', col: 'amount' }, notes, done('הושג')] },
 ];
 
 // settings.modules = [{id, enabled, title, icon, fields, ...}] — overrides by id + custom modules
 export function resolve(settings = {}) {
   const ov = new Map((settings.modules || []).map((m) => [m.id, m]));
-  const merged = DEFAULTS.map((d) => ({ ...d, enabled: true, ...ov.get(d.id) }));
+  // overrides saved by older versions keep their fields, and gain fields added to the default since
+  const merged = DEFAULTS.map((d) => {
+    const o = ov.get(d.id), m = { ...d, enabled: true, ...o };
+    if (o?.fields) m.fields = [...o.fields, ...d.fields.filter((f) => !o.fields.some((x) => x.k === f.k))];
+    return m;
+  });
   for (const m of ov.values()) if (!DEFAULTS.some((d) => d.id === m.id)) merged.push({ enabled: true, ...m });
   return merged;
 }
 
 // Validate admin-edited module JSON before saving (prevents a bad edit from breaking every phone).
-const TYPES = new Set(['text', 'number', 'money', 'date', 'time', 'select', 'textarea', 'check', 'photo']);
+const TYPES = new Set(['text', 'number', 'money', 'date', 'time', 'select', 'textarea', 'check', 'photo', 'member']);
 const LISTABLE = new Set(['text', 'number', 'money', 'date', 'time', 'select']);
 const COLS = new Set(['due', 'amount', 'done']);
 const ORDERS = new Set(['created_at', 'due', 'amount']);
@@ -72,7 +91,8 @@ export function validate(m) {
 }
 
 // Repeat → next due date strictly after today; month math clamps (Jan 31 → Feb 28/29).
-const STEP = { 'יומי': [0, 1], 'שבועי': [0, 7], 'חודשי': [1, 0], 'שנתי': [12, 0] };
+const STEP = { 'יומי': [0, 1], 'שבועי': [0, 7], 'דו-שבועי': [0, 14], 'חודשי': [1, 0], 'דו-חודשי': [2, 0],
+  'רבעוני': [3, 0], 'חצי שנתי': [6, 0], 'שנתי': [12, 0] };
 export function nextDue(dateStr, rep, todayStr) {
   const s = STEP[rep];
   if (!s) return null;

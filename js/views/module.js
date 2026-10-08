@@ -1,7 +1,7 @@
 // ===== GENERIC MODULE VIEW — list / calendar / gallery for any module definition =====
-import { h, guard, modal, buildForm, valueOf, fmtDate, fmtMoney, toast, today } from '../core/ui.js';
+import { h, guard, modal, buildForm, valueOf, fmtDate, chipText, toast, today } from '../core/ui.js';
 import { records, photos, thumbOf } from '../core/api.js';
-import { nextDue } from '../core/modules.js';
+import { completeTask, afterToggle, setStatus, expiry, needsRestock, guess } from '../core/smart.js';
 import { state } from '../core/state.js';
 import { PAGE } from '../config.js';
 
@@ -46,25 +46,43 @@ export async function renderModule(root, mod) {
     return out;
   }
 
+  const isProducts = mod.id === 'products';
+  const SKIP = isProducts ? new Set(['status', 'bought', 'cycle']) : null;   // shown by status bar instead
+
   function item(r) {
-    const chips = rest.map((f) => {
-      const v = valueOf(r, f);
-      return v != null && v !== '' && h('span', { class: 'chip' }, f.t === 'money' ? fmtMoney(v) : f.t === 'date' ? fmtDate(v) : String(v));
+    const exp = isProducts && expiry(r, now);
+    const chips = rest.filter((f) => !SKIP?.has(f.k) && f.k !== 'unit').map((f) => {
+      let t = chipText(f, valueOf(r, f));
+      if (t && f.k === 'qty' && r.data?.unit) t += ' ' + r.data.unit;      // "2 ק״ג" as one chip
+      return t && h('span', { class: `chip${f.col === 'due' && exp ? ' ' + exp : ''}` }, t);
     });
+    if (isProducts && needsRestock(r, now) === 'cycle') chips.push(h('span', { class: 'chip soon' }, 'כנראה נגמר'));
     const late = doneF && r.due && !r.done && r.due < now;
-    return h('div', { class: `item${r.done ? ' done' : ''}${late ? ' late' : ''}` },
+    return h('div', { class: `item${r.done ? ' done' : ''}${late || exp === 'expired' ? ' late' : ''}` },
       doneF && h('input', { type: 'checkbox', checked: r.done, 'aria-label': doneF.l,
         onchange: guard(async (e) => { e.target.disabled = true; try { await toggle(r); } finally { e.target.disabled = false; } }) }),
       thumb(r) && h('img', { class: 'thumb', src: thumb(r), alt: '', loading: 'lazy' }),
       h('button', { class: 'body', onclick: () => edit(r) },
-        h('strong', {}, String(valueOf(r, main) ?? '')), h('div', { class: 'chips' }, chips)));
+        h('strong', {}, String(valueOf(r, main) ?? '')), h('div', { class: 'chips' }, chips)),
+      isProducts && statusBar(r));
   }
 
-  // Repeating tasks roll their due date forward instead of being closed.
+  // Products: one-tap status; empty/low adds to the shopping list. Updates in place (no list reload).
+  const statusBar = (r) => {
+    const bar = h('div', { class: 'seg', role: 'group', 'aria-label': 'מצב' },
+      ...['מלא', 'נמוך', 'נגמר'].map((st) => h('button', { type: 'button', class: r.data?.status === st ? 'on' : '',
+        onclick: guard(async () => {
+          bar.querySelectorAll('button').forEach((b) => (b.disabled = true));
+          try { const msg = await setStatus(r, st); if (msg) toast(msg); }
+          finally { bar.replaceWith(statusBar(r)); }
+        }) }, st)));
+    return bar;
+  };
+
   async function toggle(r) {
-    const nd = !r.done && nextDue(r.due, r.data?.repeat, now);
-    await records.update(r.id, nd ? { due: nd, done: false } : { done: !r.done });
-    if (nd) toast(`הועבר ל־${fmtDate(nd)}`);
+    const msg = await afterToggle(mod, r);              // shopping ✓ → stock updated
+    const nd = await completeTask(r);                   // repeating tasks roll forward
+    if (nd) toast(`הועבר ל־${fmtDate(nd)}`); else if (msg) toast(msg);
     state.refresh();
   }
 
@@ -105,19 +123,28 @@ export async function renderModule(root, mod) {
         else if (v === '') v = null;
         if (f.col) cols[f.col] = f.col === 'done' ? !!v : v; else data[f.k] = v;
       }
+      if (isProducts && (!data.cycle || !data.category)) {   // smart defaults from the name
+        const g = guess(data.name);
+        data.cycle ||= g.cycle || 'ללא';
+        data.category ||= g.category;
+        data.bought ||= now;
+      }
       await (r.id ? records.update(r.id, { ...cols, data }) : records.insert({ household_id: hid, module: mod.id, ...cols, data }));
     } catch (e) { await photos.remove(added).catch(() => {}); throw e; }   // no orphan files on failure
     photos.remove(old).catch(() => {});                                    // replaced photos: only after save
   }
 
   // ---- header: monthly total, past toggle, search, add ----
-  root.replaceChildren(
+  root.replaceChildren(...[
     h('header', { class: 'bar' }, h('h1', {}, `${mod.icon || ''} ${mod.title}`),
-      h('button', { class: 'fab', 'aria-label': 'הוספה', onclick: guard(() => edit({ data: {}, due: mod.sum ? now : null })) }, '+')),
-    mod.sum && h('div', { class: 'stat' }, 'החודש: ', h('b', {}, fmtMoney(total))),
+      h('div', { class: 'row' },
+        mod.id === 'recipes' && h('button', { class: 'ghost', 'aria-label': 'מתכון אקראי',
+          onclick: guard(async () => (await import('./dice.js')).openDice()) }, '🎲🎲'),
+        h('button', { class: 'fab', 'aria-label': 'הוספה', onclick: guard(() => edit({ data: {}, due: mod.sum ? now : null })) }, '+'))),
+    mod.sum && h('div', { class: 'stat' }, 'החודש: ', h('b', {}, chipText({ t: 'money' }, total))),
     h('div', { class: 'row' }, search, mod.view === 'calendar' && h('label', { class: 'inline' },
       h('input', { type: 'checkbox', checked: my.past, onchange: (e) => { my.past = e.target.checked; state.refresh(); } }), 'הצג עבר')),
     list,
-    rows.length === PAGE && h('p', { class: 'hint' }, `מוצגים ${PAGE} הפריטים הראשונים`));
+    rows.length === PAGE && h('p', { class: 'hint' }, `מוצגים ${PAGE} הפריטים הראשונים`)].filter(Boolean));
   paint();
 }

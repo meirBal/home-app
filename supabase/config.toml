@@ -1,0 +1,3 @@
+# Gateway checks the JWT; the function additionally checks membership + a daily AI cap per household.
+[functions.receipt]
+verify_jwt = true

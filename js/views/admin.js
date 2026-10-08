@@ -28,7 +28,7 @@ async function saveModules(mods) {
 function editJson(m, mods) {
   const ta = h('textarea', { rows: 16, dir: 'ltr', class: 'mono', value: JSON.stringify(m, null, 1) });
   const dlg = modal(`עריכת ${m.title}`, h('div', {}, h('p', { class: 'hint' },
-    'סוגי שדות: text number money date time select textarea check photo · col: due/amount/done'), ta), [
+    'סוגי שדות: text number money date time select textarea check photo member · col: due/amount/done · pin: בסרגל התחתון'), ta), [
     !DEFAULTS.some((d) => d.id === m.id) && h('button', { class: 'danger', onclick: guard(async () => {
       if (!confirm('למחוק את המודול? הנתונים נשארים במסד')) return;
       await saveModules(mods.filter((x) => x.id !== m.id)); dlg.close();
