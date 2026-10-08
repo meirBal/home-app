@@ -21,10 +21,10 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 1. Supabase → SQL Editor → להדביק את `sql/001_schema.sql` → Run.
 2. Supabase → Authentication → Sign In / Providers → Email → לכבות **Confirm email** (שירות המייל החינמי של Supabase שולח רק לחברי הצוות).
 3. Supabase → Project Settings → API Keys → להעתיק את ה-**Publishable / anon** ל-`js/config.js`.
-4. GitHub → ריפו `home-app` (Public) → להעלות את התיקייה → Settings → Pages → Branch `main` / root.
+4. GitHub → `meirBal/home-app` → Settings → Pages → Branch `main` / root (חד-פעמי).
 5. בטלפון: לפתוח `https://meirbal.github.io/home-app/` → "הוספה למסך הבית".
 
 ## גרסאות
-- שחרור: `scripts/release.sh 1.1.0 "מה השתנה"` — מעדכן גרסה, CHANGELOG, תגית.
+- שחרור: `scripts/release.sh 1.1.0 "מה השתנה"` — מעדכן גרסה ו-CHANGELOG, מעלה ל-main ושומר ענף `release/vX.Y.Z` כנקודת שחזור.
 - חזרה: `scripts/rollback.sh 1.0.0` — משחזר כגרסה חדשה (היסטוריה לא נמחקת).
 - שינוי סכמה: קובץ חדש `sql/00N_*.sql`, לעולם לא עריכת קובץ שכבר הורץ.
