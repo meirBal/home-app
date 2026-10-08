@@ -1,7 +1,7 @@
 // ===== CONFIG — the only file to edit per deployment =====
 export const VERSION = '1.0.1';
 export const SUPABASE_URL = 'https://enhqzgjqqyubgfysnjib.supabase.co';
-export const SUPABASE_KEY = 'PASTE_PUBLISHABLE_ANON_KEY_HERE'; // public key only — never the service/secret key
+export const SUPABASE_KEY = 'sb_publishable_w3aqbIxj_ECmMOUhANPebw_thGqD9o1'; // public key only — never the service/secret key
 
 // Device profile: weak devices / data-saver get smaller images & pages.
 const mem = navigator.deviceMemory || 4;
