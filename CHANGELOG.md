@@ -1,3 +1,7 @@
+## 1.2.0 — 2026-10-09
+- Kosher recipe catalogue (107, validated) + public recipe site + scaling/cook mode; shopping list by aisle, quick add (text/voice), estimate & budget, WhatsApp; warranty module; skip tasks + weekly score; undo delete; bottom sheets; self-hosted font; 32 review fixes
+- previous: v1.1.0 (rollback: scripts/rollback.sh 1.1.0)
+
 ## 1.1.0 — 2026-10-08
 - Smart stock (units/price/expiry/cycles, auto shopping), home dashboard, recipe dice (36 recipes), task starter packs + member assignment, pets & maintenance modules, receipt scanning (AI, needs setup); 29 review fixes; unit + browser smoke tests
 - previous: v1.0.3 (rollback: scripts/rollback.sh 1.0.3)
