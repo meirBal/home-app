@@ -1,3 +1,11 @@
+## 1.1.2 — 2026-10-09
+- Book-layout app moved to its own repo/address (meirbal.github.io/sefer); /home-app/book/ now redirects there
+- previous: v1.1.1 (rollback: scripts/rollback.sh 1.1.1)
+
+## 1.1.1 — 2026-10-08
+- Service worker no longer caches the book/ app; release/rollback scripts support APP=book
+- previous: v1.1.0 (rollback: scripts/rollback.sh 1.1.0)
+
 ## 1.1.0 — 2026-10-08
 - Smart stock (units/price/expiry/cycles, auto shopping), home dashboard, recipe dice (36 recipes), task starter packs + member assignment, pets & maintenance modules, receipt scanning (AI, needs setup); 29 review fixes; unit + browser smoke tests
 - previous: v1.0.3 (rollback: scripts/rollback.sh 1.0.3)

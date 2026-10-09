@@ -27,6 +27,7 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 | `js/app.js` | אתחול, ניווט, עדכוני גרסה |
 | `sql/` | מיגרציות מסד נתונים (ממוספרות, לא עורכים קובץ שכבר רץ) |
 | `scripts/` | release / rollback |
+| `book/` | הפניה בלבד — אפליקציית עימוד הספר עברה ל-`meirBal/sefer` (https://meirbal.github.io/sefer/) |
 
 ## התקנה חד-פעמית
 1. Supabase → SQL Editor → להדביק את `sql/001_schema.sql` → Run.

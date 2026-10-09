@@ -1,5 +1,5 @@
 // ===== SERVICE WORKER — offline app shell; cache name tied to VERSION so every release refreshes =====
-const VERSION = '1.1.0';
+const VERSION = '1.1.2';
 const CACHE = `home-${VERSION}`;
 const CDN = 'cdn-v1';                            // pinned libraries + recipe data; survives app releases
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-192.png', 'fonts/rubik-hebrew.woff2', 'fonts/rubik-latin.woff2',
@@ -22,7 +22,7 @@ self.addEventListener('activate', (e) => e.waitUntil(
 // Supabase API/storage: always network (never cache user data).
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
-  if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co')) return;
+  if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co') || u.pathname.includes('/book/')) return; // book/ = separate app
   if (u.origin !== location.origin && !CDN_HOSTS.includes(u.hostname)) return;
   if (u.pathname.includes('/recipes/data/')) {
     const net = fetch(e.request).then((res) => {
