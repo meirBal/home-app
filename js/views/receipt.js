@@ -21,7 +21,10 @@ export async function scanReceipt() {
 }
 
 function review(res) {
-  const unitOf = (u) => { u = String(u || '').replace(/"/g, '״').replace(/'/g, '׳'); return UNITS.includes(u) ? u : 'יח׳'; };
+  const unitOf = (u) => {
+    u = String(u || '').replace(/"/g, '״').replace(/'/g, '׳').replace(/^(יחידה|יחידות|קילו)$/, (w) => (w === 'קילו' ? 'ק״ג' : 'יח׳'));
+    return UNITS.includes(u) ? u : 'יח׳';
+  };
   const rows = res.items.map((it) => ({ on: true, name: it.name, qty: it.qty ?? null,
     unit: unitOf(it.unit), price: it.price ?? null, category: it.category }));
   const total = res.total || rows.reduce((s, r) => s + (+r.price || 0), 0);

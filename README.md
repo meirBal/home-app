@@ -36,7 +36,7 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 4. GitHub → `meirBal/home-app` → Settings → Pages → Branch `main` / root (חד-פעמי).
 5. בטלפון: לפתוח `https://meirbal.github.io/home-app/` → "הוספה למסך הבית".
 
-## הפעלת סריקת קבלות (חד-פעמי, חינם)
+## סריקת קבלות — פעילה מ-09/10/2026 (Gemini חינמי, מודל גיבוי אוטומטי בעומס)
 1. aistudio.google.com → Get API key → Create API key.
 2. Supabase → Edge Functions → Secrets → `GEMINI_API_KEY` = המפתח.
 3. להריץ את `sql/002_smart.sql` ב-SQL Editor ולפרוס את `supabase/functions/receipt` (Claude עושה זאת דרך ה-connector).

@@ -58,20 +58,25 @@ async function handle(req: Request) {
   try { ({ image } = await req.json()); } catch { return json({ error: 'בקשה לא תקינה' }, 400); }
   if (typeof image !== 'string' || image.length < 1000 || image.length > 4_500_000) return json({ error: 'תמונה לא תקינה או גדולה מדי' }, 400);
 
-  const model = Deno.env.get('GEMINI_MODEL') || 'gemini-flash-latest';
+  // primary model, then the lighter one when Google reports overload/quota (free tier spikes are common)
+  const models = [Deno.env.get('GEMINI_MODEL') || 'gemini-flash-latest', 'gemini-flash-lite-latest'];
   await sb.from('ai_calls').insert({ household_id: hid, user_id: u.user.id });
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST', signal: AbortSignal.timeout(60_000),
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: image } }] }],
-      generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
-    }),
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: image } }] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
   });
-  if (!r.ok) {
-    const detail = (await r.text()).slice(0, 300);
-    console.error('gemini', r.status, detail);
-    return json({ error: r.status === 429 ? 'עברנו את המכסה החינמית להיום — נסו מחר' : `שגיאת AI (${r.status})` }, 502);
+  let r: Response | undefined;
+  for (const model of models) {
+    r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST', signal: AbortSignal.timeout(45_000),
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key }, body,
+    }).catch(() => undefined);
+    if (r?.ok || (r && ![429, 500, 503].includes(r.status))) break;
+    console.error('gemini', model, r?.status ?? 'timeout');
+  }
+  if (!r?.ok) {
+    if (r) console.error('gemini', r.status, (await r.text()).slice(0, 300));
+    return json({ error: r?.status === 429 ? 'עברנו את המכסה החינמית להיום — נסו מחר' : 'שירות ה-AI עמוס כרגע — נסו שוב בעוד דקה' }, 502);
   }
   try {
     const out = await r.json();
