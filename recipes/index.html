@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>מתכוני הבית</title>
+<meta name="description" content="מאגר מתכונים כשרים: חיפוש לפי מרכיב, סינון לפי ארוחה, כשרות, קושי וזמן, והתאמת כמויות לכל מספר מנות.">
+<link rel="icon" href="../icons/icon-192.png">
+<link rel="preload" href="../fonts/rubik-hebrew.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../css/app.css">
+</head>
+<body>
+<main id="view" class="site">
+  <header class="bar"><h1><a href="#" class="home-link">🍳 מתכוני הבית</a></h1><a class="btn ghost sm" href="../">לאפליקציה</a></header>
+  <div id="page"><p class="empty">טוען מתכונים…</p></div>
+</main>
+<script type="module">
+import { renderBrowser, renderRecipe, loadRecipe, el } from './lib.js';
+const page = document.getElementById('page');
+let browser, cleanup;
+async function route() {
+  cleanup?.(); cleanup = null;
+  const id = location.hash.slice(1);
+  if (!id) {
+    if (!browser) { browser = el('div'); await renderBrowser(browser, { onOpen: (rid) => (location.hash = rid) }); }
+    page.replaceChildren(browser);           // keep search/filter state when coming back
+    document.title = 'מתכוני הבית';
+    return;
+  }
+  const r = await loadRecipe(id);
+  if (!r) { page.replaceChildren(el('p', { class: 'empty' }, 'המתכון לא נמצא')); return; }
+  const box = el('article', { class: 'recipe-page' });
+  cleanup = renderRecipe(box, r, { appLink: location.href });
+  page.replaceChildren(el('a', { href: '#', class: 'hint' }, '→ חזרה לכל המתכונים'), box);
+  document.title = r.name + ' · מתכוני הבית';
+  scrollTo(0, 0);
+}
+addEventListener('hashchange', () => route().catch(fail));
+const fail = (e) => page.replaceChildren(el('p', { class: 'empty' }, e.message));
+route().catch(fail);
+</script>
+</body>
+</html>

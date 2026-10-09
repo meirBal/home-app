@@ -1,2 +1,2 @@
 // ===== SHARED STATE — single source of truth, filled by app.js =====
-export const state = { user: null, house: null, role: null, modules: [], members: [], ids: null, refresh() {}, reload() {} };
+export const state = { user: null, house: null, role: null, modules: [], members: [], ids: null, prefill: null, refresh() {}, reload() {} };

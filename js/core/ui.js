@@ -15,11 +15,17 @@ export function h(tag, props = {}, ...kids) {
 }
 
 export const $ = (s, root = document) => root.querySelector(s);
+// Map.groupBy is ES2024 (missing on iOS ≤17.3 / older WebViews)
+export const groupBy = (a, f) => a.reduce((m, x) => { const k = f(x); (m.get(k) || m.set(k, []).get(k)).push(x); return m; }, new Map());
 
-export function toast(msg, bad = false) {
-  const t = h('div', { class: `toast${bad ? ' bad' : ''}`, role: 'status' }, msg);
+// action = {label, fn, done?}: shows an action button (e.g. Undo) for 5s; done() runs if it wasn't used
+export function toast(msg, bad = false, action) {
+  document.querySelector('.toast')?.remove();          // one at a time
+  let used = false;
+  const t = h('div', { class: `toast${bad ? ' bad' : ''}`, role: 'status' }, h('span', {}, msg),
+    action && h('button', { type: 'button', class: 'toast-act', onclick: () => { used = true; t.remove(); action.fn(); } }, action.label));
   document.body.append(t);
-  setTimeout(() => t.remove(), 2600);
+  setTimeout(() => { t.remove(); if (action && !used) action.done?.(); }, action ? 5000 : 2600);
 }
 
 // Wrap async actions: shows error toast instead of silent failure.
@@ -81,9 +87,11 @@ export function chipText(f, v) {
 
 // Formatters built once (per-row construction is costly on weak phones; min=max digits avoids old-browser RangeError)
 const DATE = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short' });
+const DATE_Y = new Intl.DateTimeFormat('he-IL', { day: 'numeric', month: 'short', year: '2-digit' });
 const MONEY = new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const ISO = new Intl.DateTimeFormat('sv', { timeZone: 'Asia/Jerusalem' });
-export const fmtDate = (d) => (d ? DATE.format(new Date(d + 'T00:00')) : '');
+// year shown only when it isn't the current one (warranties, old expenses)
+export const fmtDate = (d) => (d ? (d.slice(0, 4) === today().slice(0, 4) ? DATE : DATE_Y).format(new Date(d + 'T00:00')) : '');
 export const fmtMoney = (n) => MONEY.format(+n || 0);
 export const today = () => ISO.format(new Date());          // YYYY-MM-DD, Israel time
 

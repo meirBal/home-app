@@ -21,7 +21,17 @@ page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.te
 page.on('dialog', (d) => d.accept('בוני'));
 await page.route('**/cdn.jsdelivr.net/**', (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(MOCK) }));
 
-const step = async (name, fn) => { try { await fn(); console.log('✓', name); } catch (e) { errors.push(`${name}: ${e.message.split('\n')[0]}`); console.log('✗', name); } };
+
+// every step also fails if a stray JS value leaked into the UI as text
+const STRAY = /(^|\s)(false|undefined|null|NaN|\[object Object\])(\s|$)/m;
+const step = async (name, fn) => {
+  try {
+    await fn();
+    const t = await page.locator('body').innerText().catch(() => '');
+    if (STRAY.test(t)) throw new Error('stray value on screen: ' + t.match(STRAY)[2]);
+    console.log('✓', name);
+  } catch (e) { errors.push(`${name}: ${e.message.split('\n')[0]}`); console.log('✗', name); }
+};
 const OUT = process.env.SHOTS; const shot = (n) => OUT && page.screenshot({ path: `${OUT}/${n}.png`, fullPage: true });
 const text = () => page.locator('#view').innerText();
 
@@ -114,6 +124,86 @@ await step('more grid + admin', async () => {
   await page.goto(url + '#/admin'); await page.getByText('מודולים').waitFor();
   await page.goto(url + '#/calendar'); await page.goto(url + '#/expenses'); await page.goto(url + '#/recipes'); await page.goto(url + '#/photos');
   await page.waitForTimeout(400);
+});
+await step('shopping quick add parses qty/unit/aisle', async () => {
+  await page.goto(url + '#/shopping');
+  await page.locator('.quick input').fill('2 ק"ג מלפפונים');
+  await page.locator('.quick button[type=submit]').click();
+  await page.waitForTimeout(400);
+  const it = await page.evaluate(() => window.__db.records.find((r) => r.module === 'shopping' && r.data.name === 'מלפפונים'));
+  if (!it || it.data.qty !== 2 || it.data.unit !== 'ק״ג' || it.data.category !== 'ירקות ופירות') throw new Error(JSON.stringify(it?.data));
+  if (!(await page.locator('h3.day', { hasText: 'ירקות ופירות' }).count())) throw new Error('no aisle header');
+});
+await step('quick add blocks near-duplicates', async () => {
+  await page.locator('.quick input').fill('עגבניות');
+  await page.locator('.quick button[type=submit]').click();
+  await page.waitForTimeout(400);
+  const n = await page.evaluate(() => window.__db.records.filter((r) => r.module === 'shopping' && !r.done && /^עגבני/.test(r.data.name)).length);
+  if (n !== 1) throw new Error('duplicates: ' + n);
+});
+await step('shopping whatsapp export', async () => {
+  await page.evaluate(() => { window.open = (u) => { window.__wa = u; }; });
+  await page.getByRole('button', { name: /שליחה בוואטסאפ/ }).click();
+  const href = decodeURIComponent(await page.evaluate(() => window.__wa || ''));
+  if (!href.includes('*ירקות ופירות*') || !href.includes('☐ מלפפונים (2 ק״ג)')) throw new Error(href.slice(0, 200));
+  await shot('6-shopping');
+});
+await step('delete with undo restores row', async () => {
+  await page.locator('.item', { hasText: 'מלפפונים' }).first().locator('.body').click();
+  await page.locator('dialog .danger').click();
+  await page.getByRole('button', { name: 'ביטול' }).click();
+  await page.waitForTimeout(300);
+  const back = await page.evaluate(() => window.__db.records.some((r) => r.module === 'shopping' && r.data.name === 'מלפפונים'));
+  if (!back) throw new Error('not restored');
+});
+await step('product with warranty → prefilled warranty card → end date', async () => {
+  await page.goto(url + '#/products');
+  await page.locator('.fab').click();
+  await page.locator('dialog input[name=name]').fill('מקרר');
+  await page.locator('dialog input[name=warranty]').check();
+  await page.locator('dialog button[type=submit]').click();
+  await page.locator('dialog input[name=months]').waitFor({ timeout: 3000 });
+  if (await page.locator('dialog input[name=name]').inputValue() !== 'מקרר') throw new Error('not prefilled');
+  await page.locator('dialog input[name=bought]').fill('2026-01-31');
+  await page.locator('dialog input[name=months]').fill('24');
+  await page.locator('dialog button[type=submit]').click();
+  await page.waitForTimeout(400);
+  const w = await page.evaluate(() => window.__db.records.find((r) => r.module === 'warranty'));
+  if (w?.due !== '2028-01-31') throw new Error(JSON.stringify(w));
+  await shot('7-warranty');
+});
+await step('recipe library: browse, scale, add missing', async () => {
+  await page.goto(url + '#/library');
+  await page.locator('.rcard').first().waitFor({ timeout: 5000 });
+  await page.locator('.rcard', { hasText: 'שקשוקה קלאסית' }).click();
+  await page.locator('.ing-list li').first().waitFor();
+  const before = await page.locator('.ing-list li').first().innerText();
+  await page.getByRole('button', { name: 'יותר מנות' }).click();
+  await page.getByRole('button', { name: 'יותר מנות' }).click();
+  const after = await page.locator('.ing-list li').first().innerText();
+  if (before === after || !after.includes('9')) throw new Error(`${before} → ${after}`);
+  await shot('8-recipe');
+  await page.getByRole('button', { name: /חסרים לרשימת הקניות/ }).click();
+  await page.waitForTimeout(400);
+  const n = await page.evaluate(() => window.__db.records.filter((r) => r.module === 'shopping' && r.data.name === 'פלפל אדום').length);
+  if (n !== 1) throw new Error('missing items not added');
+});
+await step('home: skip + weekly score', async () => {
+  await page.goto(url + '#/home');
+  await page.locator('.item', { hasText: 'האכלה' }).getByRole('button', { name: 'דלג' }).click();
+  await page.waitForTimeout(300);
+  await page.locator('.item', { hasText: 'מים טריים' }).locator('input[type=checkbox]').click();
+  await page.waitForTimeout(500);
+  await page.goto(url + '#/more'); await page.goto(url + '#/home');
+  await page.getByText('7 הימים האחרונים').waitFor({ timeout: 3000 });
+});
+await step('recipe site standalone', async () => {
+  await page.goto(url + 'recipes/');
+  await page.locator('.rcard').first().waitFor({ timeout: 5000 });
+  await page.locator('input[type=search]').fill('חומוס');
+  await page.waitForTimeout(200);
+  if ((await page.locator('.rcard').count()) < 2) throw new Error('search');
+  await shot('9-site');
 });
 await step('desktop layout', async () => { await page.setViewportSize({ width: 1280, height: 800 }); await page.goto(url + '#/home'); await page.waitForTimeout(300); await shot('5-desktop'); });
 

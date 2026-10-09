@@ -65,6 +65,7 @@ function shell() {
   const mods = state.modules.filter((m) => m.enabled !== false);
   nav.replaceChildren(link('home', '🏠', 'בית'),
     ...mods.map((m) => link(m.id, m.icon, m.title, m.pin ? '' : 'x')),
+    link('library', '📚', 'מתכונים'),
     link('more', '☰', 'עוד', 'm'),
     state.role === 'admin' && link('admin', '⚙️', 'ניהול', 'x'));
   app.replaceChildren(main, nav);
@@ -76,18 +77,19 @@ let seq = 0;                                     // drop stale renders when user
 
 const route = guard(async () => {
   if (!state.house) return;
-  const id = current(), my = ++seq;
+  const [id, sub] = current().split('/'), my = ++seq;
   nav.querySelectorAll('a').forEach((a) => a.classList.toggle('on', a.dataset.id === id));
   const view = h('div');
   if (id === 'admin' && state.role === 'admin') await (await import('./views/admin.js')).renderAdmin(view);
   else if (id === 'home') await renderHome(view);
+  else if (id === 'library') await (await import('./views/library.js')).renderLibrary(view, sub);
   else if (id === 'more') more(view);
   else {
     const mod = state.modules.find((m) => m.id === id && m.enabled !== false);
     if (!mod) return (location.hash = '');
     await renderModule(view, mod);
   }
-  if (my === seq) main.replaceChildren(view);
+  if (my === seq) { main.replaceChildren(view); if (sub) scrollTo(0, 0); }
 });
 state.refresh = route;
 addEventListener('hashchange', route);
@@ -96,6 +98,7 @@ function more(view) {
   const mods = state.modules.filter((m) => m.enabled !== false);
   view.append(h('header', { class: 'bar' }, h('h1', {}, '☰ כל האזורים')),
     h('div', { class: 'grid' }, ...mods.map((m) => h('a', { href: `#/${m.id}` }, h('i', {}, m.icon || '•'), h('span', {}, m.title))),
+      h('a', { href: '#/library' }, h('i', {}, '📚'), h('span', {}, 'מאגר המתכונים')),
       state.role === 'admin' && h('a', { href: '#/admin' }, h('i', {}, '⚙️'), h('span', {}, 'ניהול'))),
     h('section', { class: 'card' },
       h('p', {}, `${state.house.name} · גרסה ${VERSION}`),

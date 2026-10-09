@@ -1,14 +1,15 @@
 // ===== HOME — today at a glance: tasks, expiry, restock suggestions, dice & receipt shortcuts =====
-import { h, guard, toast, fmtDate, chipText, memberName, today, DICE_SVG } from '../core/ui.js';
+import { h, guard, toast, fmtDate, chipText, memberName, today, DICE_SVG, groupBy } from '../core/ui.js';
 import { records } from '../core/api.js';
 import { TASK_MODULES } from '../core/modules.js';
-import { completeTask, expiry, needsRestock, addToShopping, norm } from '../core/smart.js';
+import { completeTask, skipTask, expiry, needsRestock, addToShopping, norm, warrantyState } from '../core/smart.js';
 import { packs, packRows } from '../data/seeds.js';
 import { state } from '../core/state.js';
 
-const ui = { mine: false };
+const ui = { mine: false, pruned: false };
 // disable the control while the action runs; re-enable on error (guard shows the toast)
 const busy = (fn) => guard(async (e) => { const el = e.currentTarget || e.target; el.disabled = true; try { await fn(e); } finally { el.disabled = false; } });
+const plus = (d, n) => { const t = new Date(d + 'T12:00'); t.setDate(t.getDate() + n); return t.toLocaleDateString('sv'); };
 const section = (title, ...kids) => h('section', { class: 'card' }, h('h2', {}, title), ...kids);
 
 export async function renderHome(root) {
@@ -18,10 +19,13 @@ export async function renderHome(root) {
   const tmr = new Date(now + 'T12:00'); tmr.setDate(tmr.getDate() + 1);
   const until = tmr.toLocaleDateString('sv');
 
-  const [tasks, prods, open, ...hasMods] = await Promise.all([
+  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
+  const [tasks, prods, open, wars, log, ...hasMods] = await Promise.all([
     records.dueTasks(hid, [...taskMods, ...(mods.has('calendar') ? ['calendar'] : [])], until),
     mods.has('products') ? records.all(hid, 'products') : [],
     mods.has('shopping') ? records.open(hid, 'shopping') : [],
+    mods.has('warranty') ? records.between(hid, 'warranty', now, plus(now, 30)) : [],
+    taskMods.length ? records.since(hid, 'log', weekAgo) : [],
     ...taskMods.map((m) => records.has(hid, m)),
   ]);
   const used = new Set(taskMods.filter((_, i) => hasMods[i]));
@@ -35,10 +39,13 @@ export async function renderHome(root) {
     const m = mods.get(t.module), isEvent = t.module === 'calendar';
     return h('div', { class: `item${!isEvent && t.due < now ? ' late' : ''}` },
       !isEvent && h('input', { type: 'checkbox', 'aria-label': 'בוצע', onchange: busy(async () => {
-        const nd = await completeTask(t);
+        const nd = await completeTask(t, t.module);
         toast(nd ? `כל הכבוד! הבא: ${fmtDate(nd)}` : 'כל הכבוד!');
         state.refresh();
       }) }),
+      !isEvent && t.data?.repeat && h('button', { class: 'ghost sm', title: 'דלג לפעם הבאה', onclick: busy(async () => {
+        const nd = await skipTask(t); toast(`דילגנו. הבא: ${fmtDate(nd)}`); state.refresh();
+      }) }, 'דלג'),
       h('a', { class: 'body', href: `#/${t.module}` },
         h('strong', {}, `${m?.icon || ''} ${t.data?.title || ''}`),
         h('div', { class: 'chips' },
@@ -54,6 +61,11 @@ export async function renderHome(root) {
   const restock = prods.filter((p) => needsRestock(p, now) && !onList.has(norm(p.data?.name)));
   const picks = new Set(restock.map((p) => p.id));
   const why = { 'נגמר': 'נגמר', 'נמוך': 'נמוך', cycle: 'לפי קצב הצריכה' };
+
+  // ---- [Warranties ending within 30 days; weekly family score from the task log] ----
+  const warn = wars.map((w) => ({ w, s: warrantyState(w, now) })).filter((x) => x.s?.cls === 'soon');
+  const score = [...groupBy(log, (l) => l.created_by)].map(([by, ls]) => [memberName(by) || '?', ls.length]).sort((a, b) => b[1] - a[1]);
+  if (!ui.pruned) { ui.pruned = true; records.prune(hid, 'log', new Date(Date.now() - 30 * 864e5).toISOString()).then(() => {}, () => {}); }
 
   const name = memberName(me);
   root.replaceChildren(...[
@@ -80,6 +92,14 @@ export async function renderHome(root) {
       h('div', { class: 'list' }, ...exp.map((p) => h('a', { class: 'item late', href: '#/products' },
         h('strong', { class: 'grow' }, p.data?.name),
         h('span', { class: `chip ${expiry(p, now)}` }, `${expiry(p, now) === 'expired' ? 'פג' : 'עד'} ${fmtDate(p.due)}`))))),
+
+    warn.length > 0 && section('🛡️ אחריות שנגמרת בקרוב',
+      h('div', { class: 'list' }, ...warn.map(({ w, s }) => h('a', { class: 'item', href: '#/warranty' },
+        h('strong', { class: 'grow' }, w.data?.name), h('span', { class: 'chip soon' }, s.text))))),
+
+    score.length > 0 && section('🏆 7 הימים האחרונים',
+      h('div', { class: 'score' }, ...score.map(([n, c], i) => h('div', { class: 'row' },
+        h('span', { class: 'grow' }, `${['🥇', '🥈', '🥉'][i] || '⭐'} ${n}`), h('b', {}, `${c} משימות`))))),
 
     restock.length > 0 && section('🛒 כדאי לקנות',
       h('div', { class: 'list' }, ...restock.map((p) => h('label', { class: 'item' },

@@ -38,13 +38,20 @@ export const records = {
     if (order !== 'created_at') q = q.order('created_at', { ascending: false });   // stable order between taps
     return q.limit(PAGE).then(ok);
   },
-  sum: async (h, module, from, to) => ok(await sb.from('records').select('amount')
-    .match({ household_id: h, module }).gte('due', from).lt('due', to))
-    .reduce((s, r) => s + (+r.amount || 0), 0),
+  sum: async (h, module, from, to, category) => {
+    let q = sb.from('records').select('amount').match({ household_id: h, module }).gte('due', from).lt('due', to);
+    if (category) q = q.eq('data->>category', category);
+    return ok(await q).reduce((s, r) => s + (+r.amount || 0), 0);
+  },
   // smart features: full name lists (not PAGE-capped), open items, due tasks, "is module used"
-  all: (h, module) => sb.from('records').select('id, data, due').match({ household_id: h, module }).limit(2000).then(ok),
+  all: (h, module) => sb.from('records').select('id, data, due, amount').match({ household_id: h, module }).limit(2000).then(ok),
+  between: (h, module, from, to) => sb.from('records').select('id, data, due').match({ household_id: h, module })
+    .gte('due', from).lte('due', to).limit(200).then(ok),
   has: async (h, module) => ((await sb.from('records').select('id', { count: 'exact', head: true })
     .match({ household_id: h, module }).limit(1)).count || 0) > 0,
+  since: (h, module, iso) => sb.from('records').select('created_by').match({ household_id: h, module })
+    .gte('created_at', iso).limit(1000).then(ok),
+  prune: (h, module, beforeIso) => sb.from('records').delete().match({ household_id: h, module }).lt('created_at', beforeIso),
   open: (h, module) => sb.from('records').select('id, data').match({ household_id: h, module, done: false }).then(ok),
   dueTasks: (h, modules, until) => sb.from('records').select('id, module, data, due, done')
     .eq('household_id', h).in('module', modules).eq('done', false).lte('due', until).order('due').limit(100).then(ok),
@@ -62,6 +69,7 @@ export const records = {
   update: (id, patch) => wrote(sb.from('records').update(patch).eq('id', id).select('id').then(ok))
     .then((r) => { if (!r.length) throw new Error('הפריט נמחק במכשיר אחר'); }),
   remove: (id) => wrote(sb.from('records').delete().eq('id', id).then(ok)),
+  removeDone: (h, module) => wrote(sb.from('records').delete().match({ household_id: h, module, done: true }).then(ok)),
 };
 
 // ---- [Edge functions (AI receipt reader)] ----

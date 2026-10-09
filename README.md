@@ -11,9 +11,13 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 | `js/core/ui.js` | DOM, טפסים מסכמה, חלונות, הודעות |
 | `js/core/state.js` | מצב משותף |
 | `js/core/smart.js` | מנוע חכם: התאמת שמות בעברית, ניחוש מחזור/קטגוריה, מלאי ↔ קניות, השלמת משימות |
-| `js/data/recipes.js` · `seeds.js` | מאגר מתכונים מובנה · חבילות משימות מומלצות |
+| `js/data/seeds.js` | חבילות משימות מומלצות |
+| `recipes/` | מאגר מתכונים כשר: `src/*.txt` (מקור) → `data/*.json` (נבנה) · `lib.js` משותף לאתר ולאפליקציה · `index.html` = אתר המתכונים · `LOOP.md` = הוראות ללולאה היומית |
+| `tools/build-recipes.mjs` | בונה ומאמת מתכונים (מבנה, כפילויות, כשרות: בשר/חלב/דגים/אסורים) |
+| `js/views/library.js` | מאגר המתכונים באפליקציה: מיון לפי מה שיש בבית, הוספת חסרים |
+| `fonts/` | Rubik מאוחסן מקומית (פרטיות + אופליין), רישיון OFL |
 | `js/views/home.js` | מסך בית: היום ומחר, תוקף, כדאי לקנות, חבילות התחלה |
-| `js/views/dice.js` | 🎲🎲 מתכון לפי ארוחה × רעב × מה שיש בבית |
+| `js/views/dice.js` | 🎲🎲 מתכון לפי ארוחה × רעב × מה שיש בבית (מתוך המאגר + המתכונים שלנו) |
 | `js/views/receipt.js` | סריקת קבלה → אישור → מלאי/קניות/הוצאה |
 | `supabase/functions/receipt` | Edge Function: קבלה → פריטים (Gemini, מכסה יומית למשק בית) |
 | `tests/` | `node tests/smart.test.mjs` · `node tests/smoke.mjs .` (דפדפן + שרת מדומה) |
