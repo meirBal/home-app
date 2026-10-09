@@ -1,3 +1,7 @@
+## 1.3.0 — 2026-10-09
+- Receipt scan: computerized PDF receipts (multi-page), promotions/deposits ignored, durable items skip stock, automatic warranty cards with shared receipt photo, total sanity check; 'כלי בית' aisle; 7 review fixes
+- previous: v1.2.1 (rollback: scripts/rollback.sh 1.2.1)
+
 ## 1.2.1 — 2026-10-09
 - Receipt scanning live: AI fallback model when busy, unit normalisation; DB migration 002 applied
 - previous: v1.2.0 (rollback: scripts/rollback.sh 1.2.0)

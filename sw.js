@@ -1,5 +1,5 @@
 // ===== SERVICE WORKER — offline app shell; cache name tied to VERSION so every release refreshes =====
-const VERSION = '1.2.1';
+const VERSION = '1.3.0';
 const CACHE = `home-${VERSION}`;
 const CDN = 'cdn-v1';                            // pinned libraries + recipe data; survives app releases
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-192.png', 'fonts/rubik-hebrew.woff2', 'fonts/rubik-latin.woff2',
