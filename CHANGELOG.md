@@ -1,3 +1,7 @@
+## 1.2.0 — 2026-10-09
+- Kosher recipe catalogue (107, validated) + public recipe site + scaling/cook mode; shopping list by aisle, quick add (text/voice), estimate & budget, WhatsApp; warranty module; skip tasks + weekly score; undo delete; bottom sheets; self-hosted font; 32 review fixes
+- previous: v1.1.2 (rollback: scripts/rollback.sh 1.1.2)
+
 ## 1.1.2 — 2026-10-09
 - Book-layout app moved to its own repo/address (meirbal.github.io/sefer); /home-app/book/ now redirects there
 - previous: v1.1.1 (rollback: scripts/rollback.sh 1.1.1)
