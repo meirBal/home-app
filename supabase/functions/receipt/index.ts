@@ -1,4 +1,4 @@
-// ===== EDGE FUNCTION receipt — photo of a grocery receipt → structured items (Gemini free tier) =====
+// ===== EDGE FUNCTION receipt — receipt photo or digital PDF → structured items (Gemini free tier) =====
 // Secrets: GEMINI_API_KEY (required), GEMINI_MODEL (optional, default gemini-flash-latest)
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
 
@@ -9,25 +9,29 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-const PROMPT = `זו תמונה של קבלה מסופרמרקט/חנות בישראל. חלץ את כל הפריטים שנקנו.
-- name: שם מוצר קצר וכללי בעברית כפי שאדם היה כותב ברשימת קניות (למשל "חלב 3%" ולא קוד או מק"ט). תקן קיצורים.
-- qty: כמות (מספר). למוצרים בשקילה — המשקל בק"ג.
-- unit: אחד מ: יח׳, ק״ג, גרם, ליטר, מ״ל, אריזה
-- price: המחיר הכולל ששולם על השורה (אחרי הנחות), מספר.
-- category: אחת מ: ירקות ופירות, מוצרי חלב, בשר ודגים, מאפים, יבשים ושימורים, קפואים, משקאות, ניקיון, טואלטיקה, תינוקות, בעלי חיים, אחר
-התעלם משורות שאינן מוצרים (שקית, עיגול, אמצעי תשלום, מע"מ). אחד שורות כפולות של אותו מוצר.
-store = שם החנות, date = תאריך הקנייה בפורמט YYYY-MM-DD (או ריק), total = סכום לתשלום.`;
+const PROMPT = `זו קבלה מסופרמרקט/חנות בישראל (צילום או PDF ממוחשב, ייתכן כמה עמודים). חלץ את כל הפריטים שנקנו.
+כללים:
+- name: שם מוצר קצר וברור בעברית כמו ברשימת קניות ("חלב 3%", "כרוב אדום", "שמפו"). בלי ברקוד/מק"ט. השלם קיצורים חתוכים כשהמשמעות ברורה.
+- שם שנחתך בין עמודים או בין שורות שייך לשורה שהמחיר שלה מופיע לידו או אחריו — אחד אותם לפריט אחד.
+- qty: כמות. מוצר בשקילה (ק"ג) → המשקל. unit: אחד מ: יח׳, ק״ג, גרם, ליטר, מ״ל, אריזה.
+- price: הסכום ששולם על השורה. שורות מבצע/הנחה ("2 ב 36", "3 ב 50", "מוגבל 3", "הנחה", מספר שלילי) אינן פריטים — אל תוסיף אותן כפריט.
+- התעלם: פיקדון/מיחזור אריזה, שקית, עיגול, אמצעי תשלום, מע"מ, סיכומי ביניים.
+- category: אחת מ: ירקות ופירות, מוצרי חלב, בשר ודגים, מאפים, יבשים ושימורים, קפואים, משקאות, ניקיון, טואלטיקה, תינוקות, בעלי חיים, כלי בית, אחר
+- durable: true למוצר שאינו מתכלה (כלים, מכשירי חשמל, כלי מטבח, תאורה, טקסטיל, כלי עבודה); false למזון ומתכלים.
+- warranty_months: רק למכשירי חשמל/אלקטרוניקה (מיחם, פלטה, מנורה חשמלית, מכשיר מטבח) — 12 אם לא ידוע אחרת; אחרת 0.
+store = שם החנות/הרשת, date = תאריך הקנייה YYYY-MM-DD, total = הסכום הסופי ששולם (אחרי הנחות) אם מופיע.`;
 
 const SCHEMA = {
   type: 'OBJECT',
   properties: {
     store: { type: 'STRING' }, date: { type: 'STRING' }, total: { type: 'NUMBER' },
     items: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
-      name: { type: 'STRING' }, qty: { type: 'NUMBER' }, unit: { type: 'STRING' },
-      price: { type: 'NUMBER' }, category: { type: 'STRING' } }, required: ['name'] } },
+      name: { type: 'STRING' }, qty: { type: 'NUMBER' }, unit: { type: 'STRING' }, price: { type: 'NUMBER' },
+      category: { type: 'STRING' }, durable: { type: 'BOOLEAN' }, warranty_months: { type: 'NUMBER' } }, required: ['name'] } },
   },
   required: ['items'],
 };
+const MIMES = ['image/jpeg', 'application/pdf'];
 
 const DAILY_CAP = 30;                                           // AI scans per household per 24h
 
@@ -54,15 +58,16 @@ async function handle(req: Request) {
   const { count } = await sb.from('ai_calls').select('id', { count: 'exact', head: true }).eq('household_id', hid).gte('at', since);
   if ((count ?? 0) >= DAILY_CAP) return json({ error: `הגעתם ל־${DAILY_CAP} סריקות היום — נסו מחר` }, 429);
 
-  let image: string;
-  try { ({ image } = await req.json()); } catch { return json({ error: 'בקשה לא תקינה' }, 400); }
-  if (typeof image !== 'string' || image.length < 1000 || image.length > 4_500_000) return json({ error: 'תמונה לא תקינה או גדולה מדי' }, 400);
+  let image: string, mime: string;
+  try { ({ image, mime = 'image/jpeg' } = await req.json()); } catch { return json({ error: 'בקשה לא תקינה' }, 400); }
+  if (!MIMES.includes(mime)) return json({ error: 'סוג קובץ לא נתמך (תמונה או PDF)' }, 400);
+  if (typeof image !== 'string' || image.length < 1000 || image.length > 4_500_000) return json({ error: 'הקובץ לא תקין או גדול מדי' }, 400);
 
   // primary model, then the lighter one when Google reports overload/quota (free tier spikes are common)
   const models = [Deno.env.get('GEMINI_MODEL') || 'gemini-flash-latest', 'gemini-flash-lite-latest'];
   await sb.from('ai_calls').insert({ household_id: hid, user_id: u.user.id });
   const body = JSON.stringify({
-    contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: image } }] }],
+    contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: image } }] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json', responseSchema: SCHEMA },
   });
   let r: Response | undefined;

@@ -8,6 +8,7 @@ import { state } from '../core/state.js';
 import { PAGE } from '../config.js';
 
 const ui = {};                                         // per-module UI memory (search text, past toggle) survives refreshes
+const held = new Map();                                 // photo path → rows deleted but still undoable
 const buzz = () => navigator.vibrate?.(12);            // light haptic confirmation where supported
 
 export async function renderModule(root, mod) {
@@ -146,16 +147,24 @@ export async function renderModule(root, mod) {
     }));
   }
 
+  // [k, path] pairs → delete files no other row still references (one receipt photo can back several warranty cards);
+  // paths of rows still inside their undo window are kept until that window closes
+  const dropUnused = (refs) => Promise.all(refs.map(async ([k, v]) => (held.get(v) || await records.inUse(hid, mod.id, k, v) ? null : v)))
+    .then((free) => photos.remove(free.filter(Boolean))).catch(() => {});
+
   // Delete with Undo: the row is restored as-is; its photos are deleted only after the undo window closes.
   async function remove(r) {
     await records.remove(r.id);
-    const files = photoFs.map((f) => r.data?.[f.k]).filter(Boolean);
+    const refs = photoFs.map((f) => [f.k, r.data?.[f.k]]).filter(([, v]) => v);
+    const hold = (d) => refs.forEach(([, v]) => { const n = (held.get(v) || 0) + d; n > 0 ? held.set(v, n) : held.delete(v); });
+    hold(1);
     state.refresh();
     toast('נמחק', false, { label: 'ביטול', fn: guard(async () => {
+      hold(-1);
       await records.insert({ id: r.id, household_id: hid, module: mod.id, data: r.data, due: r.due ?? null, amount: r.amount ?? null,
         done: !!r.done, created_at: r.created_at });
       state.refresh();
-    }), done: () => photos.remove(files).catch(() => {}) });
+    }), done: () => { hold(-1); dropUnused(refs); } });
   }
 
   async function save(r, form) {
@@ -166,7 +175,7 @@ export async function renderModule(root, mod) {
         let v = f.t === 'check' ? el.checked : f.t === 'photo' ? el.files[0] : el.value.trim();
         if (f.t === 'photo') {
           if (!v) { if (f.req && !r.data?.[f.k]) throw new Error('חובה לבחור תמונה'); continue; }
-          if (r.data?.[f.k]) old.push(r.data[f.k]);
+          if (r.data?.[f.k]) old.push([f.k, r.data[f.k]]);
           v = await photos.upload(hid, v); added.push(v);
         } else if (f.t === 'number' || f.t === 'money') v = v === '' ? null : Number(v);
         else if (v === '') v = null;
@@ -182,7 +191,7 @@ export async function renderModule(root, mod) {
       if (isWarranty && (!cols.due || cols.due === r.due)) cols.due = warrantyEnd(data.bought, data.months) || cols.due;   // auto unless typed
       await (r.id ? records.update(r.id, { ...cols, data }) : records.insert({ household_id: hid, module: mod.id, ...cols, data }));
     } catch (e) { await photos.remove(added).catch(() => {}); throw e; }   // no orphan files on failure
-    photos.remove(old).catch(() => {});                                    // replaced photos: only after save
+    dropUnused(old);                                                       // replaced photos: only after save
     if (isProducts && data.warranty && !r.data?.warranty) {                // "has warranty" → open a prefilled warranty card
       state.prefill = { module: 'warranty', data: { name: data.name, bought: data.bought || now }, amount: cols.amount ?? null };
       return '#/warranty';

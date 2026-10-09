@@ -116,8 +116,10 @@ await step('receipt review + apply', async () => {
     milk: window.__db.records.filter((x) => x.module === 'products' && x.data.name.startsWith('חלב')).map((x) => x.data.name),
     bread: window.__db.records.find((x) => x.module === 'shopping' && x.data.name === 'לחם')?.done,
     exp: window.__db.records.find((x) => x.module === 'expenses')?.amount,
+    war: window.__db.records.filter((x) => x.module === 'warranty').map((x) => [x.data.months, !!x.due, !!x.data.receipt]),
+    urn: window.__db.records.some((x) => x.module === 'products' && x.data.name.includes('מיחם')),
   }));
-  if (r.milk.length !== 1 || !r.bread || r.exp !== 42.5) throw new Error(JSON.stringify(r));
+  if (r.milk.length !== 1 || !r.bread || r.exp !== 192.5 || JSON.stringify(r.war) !== '[[12,true,true]]' || r.urn) throw new Error(JSON.stringify(r));
 });
 await step('more grid + admin', async () => {
   await page.goto(url + '#/more'); await page.getByText('כל האזורים').waitFor();
@@ -168,7 +170,7 @@ await step('product with warranty → prefilled warranty card → end date', asy
   await page.locator('dialog input[name=months]').fill('24');
   await page.locator('dialog button[type=submit]').click();
   await page.waitForTimeout(400);
-  const w = await page.evaluate(() => window.__db.records.find((r) => r.module === 'warranty'));
+  const w = await page.evaluate(() => window.__db.records.find((r) => r.module === 'warranty' && r.data.name === 'מקרר'));
   if (w?.due !== '2028-01-31') throw new Error(JSON.stringify(w));
   await shot('7-warranty');
 });

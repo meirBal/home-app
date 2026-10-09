@@ -102,7 +102,7 @@ export async function setStatus(p, status) {
 // `known` = full product list (fetched once per batch); fuzzy match "חלב 3% תנובה" → "חלב"; kept up to date.
 export async function restock({ name, qty, unit, price, category }, known) {
   const hid = state.house.id, n = norm(name), now = today();
-  if (!n || !state.modules.some((m) => m.id === 'products' && m.enabled !== false)) return;
+  if (!n || !state.modules.some((m) => m.id === 'products' && m.enabled !== false)) return false;
   known ||= await records.all(hid, 'products');
   const t = tokens(n), p = known.find((x) => similar(x._t ||= tokens(x.data?.name), t));
   const num = Number(qty);
@@ -110,12 +110,14 @@ export async function restock({ name, qty, unit, price, category }, known) {
   const amount = price != null && price !== '' && Number.isFinite(+price) ? +price : undefined;
   if (p) {
     Object.assign(p.data, patch);
-    return records.patch(p.id, patch, amount);
+    await records.patch(p.id, patch, amount);
+    return true;
   }
   const g = guess(n);
   const data = { name: n, category: category || g.category, cycle: g.cycle || 'ללא', ...patch };
   const row = await records.insert({ household_id: hid, module: 'products', amount: amount ?? null, data });
   known.push({ id: row.id, data, _t: t });
+  return true;
 }
 
 // Task ✓: repeating tasks roll forward (strictly after today), others close. Returns new due or null.

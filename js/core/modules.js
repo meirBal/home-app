@@ -17,7 +17,7 @@ export const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'מ״ל', 'אר�
 const qty = [{ k: 'qty', l: 'כמות', t: 'number' }, { k: 'unit', l: 'יחידה', t: 'select', o: UNITS }];
 // supermarket walking order — the shopping list is grouped in this order
 export const CATEGORIES = ['ירקות ופירות', 'מאפים', 'מוצרי חלב', 'בשר ודגים', 'יבשים ושימורים', 'קפואים',
-  'משקאות', 'ניקיון', 'טואלטיקה', 'תינוקות', 'בעלי חיים', 'אחר'];
+  'משקאות', 'ניקיון', 'טואלטיקה', 'תינוקות', 'בעלי חיים', 'כלי בית', 'אחר'];
 export const WARRANTY_CATS = ['אלקטרוניקה', 'מוצרי חשמל לבית', 'ריהוט', 'כלי עבודה', 'רכב', 'ביגוד והנעלה', 'אחר'];
 export const CYCLES = ['ללא', 'כל 3 ימים', 'כל שבוע', 'כל שבועיים', 'כל חודש', 'כל חודשיים', 'כל 3 חודשים'];
 export const TASK_MODULES = ['routine', 'periodic', 'maintenance', 'pets'];

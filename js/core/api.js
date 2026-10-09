@@ -49,6 +49,8 @@ export const records = {
     .gte('due', from).lte('due', to).limit(200).then(ok),
   has: async (h, module) => ((await sb.from('records').select('id', { count: 'exact', head: true })
     .match({ household_id: h, module }).limit(1)).count || 0) > 0,
+  inUse: async (h, module, k, v) => ((await sb.from('records').select('id', { count: 'exact', head: true })
+    .match({ household_id: h, module }).eq(`data->>${k}`, v)).count || 0) > 0,   // shared file (e.g. one receipt, many warranty cards)
   since: (h, module, iso) => sb.from('records').select('created_by').match({ household_id: h, module })
     .gte('created_at', iso).limit(1000).then(ok),
   prune: (h, module, beforeIso) => sb.from('records').delete().match({ household_id: h, module }).lt('created_at', beforeIso),
@@ -110,6 +112,8 @@ async function shrink(bmp, max, quality, px = Infinity) {
 const urlCache = new Map();                          // path → {url, exp} — stable URLs = browser cache hits
 const TTL = 3600;
 
+export const isPdf = (f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '');   // some Android pickers send no type
+
 export const photos = {
   upload: async (h, file) => {
     let bmp;
@@ -128,16 +132,21 @@ export const photos = {
       if (u.signedUrl) urlCache.set(u.path, { url: u.signedUrl, exp: now + TTL - 300 });
     return Object.fromEntries(paths.map((p) => [p, urlCache.get(p)?.url]));
   },
-  // receipt → JPEG base64, ~2.5MP budget (readable text, within edge function limits)
+  // receipt → base64 for the AI: PDF as-is (≤3MB), image → JPEG ~2.5MP (readable text, within edge function limits)
   base64: async (file) => {
-    let bmp;
-    try { bmp = await createImageBitmap(file); } catch { throw new Error('לא ניתן לקרוא את התמונה'); }
-    try {
-      const buf = new Uint8Array(await (await shrink(bmp, 4000, 0.8, 2.5e6)).arrayBuffer());
+    const b64 = async (blob) => {
+      const buf = new Uint8Array(await blob.arrayBuffer());
       let s = '';
       for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode(...buf.subarray(i, i + 0x8000));
       return btoa(s);
-    } finally { bmp.close(); }
+    };
+    if (isPdf(file)) {
+      if (file.size > 3e6) throw new Error('קובץ PDF גדול מדי (עד 3MB)');
+      return { data: await b64(file), mime: 'application/pdf' };
+    }
+    let bmp;
+    try { bmp = await createImageBitmap(file); } catch { throw new Error('לא ניתן לקרוא את התמונה'); }
+    try { return { data: await b64(await shrink(bmp, 4000, 0.8, 2.5e6)), mime: 'image/jpeg' }; } finally { bmp.close(); }
   },
   remove: async (paths) => { if (paths.length) await bucket().remove(paths.flatMap((p) => [p, thumbOf(p)])); },
 };

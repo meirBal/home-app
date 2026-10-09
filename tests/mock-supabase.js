@@ -64,9 +64,10 @@ export function createClient() {
     channel: () => { const c = { on: () => c, subscribe: () => c }; return c; },
     removeChannel() {},
     storage: { from: () => ({ createSignedUrls: async (ps) => ({ data: ps.map((p) => ({ path: p, signedUrl: 'data:,' })), error: null }), upload: async () => ({ data: {}, error: null }), remove: async () => ({}) }) },
-    functions: { invoke: async () => ({ data: { store: 'שופרסל', date: today, total: 42.5, items: [
+    functions: { invoke: async () => ({ data: { store: 'שופרסל', date: today, total: 192.5, items: [
       { name: 'חלב 3% תנובה', qty: 2, unit: 'ליטר', price: 13.8, category: 'מוצרי חלב' },
       { name: 'לחם אחיד', qty: 1, unit: 'יח׳', price: 8.7, category: 'מאפים' },
-      { name: 'מרכך כביסה', qty: 1, unit: 'יח׳', price: 20, category: 'ניקיון' }] }, error: null }) },
+      { name: 'מרכך כביסה', qty: 1, unit: 'יח׳', price: 20, category: 'ניקיון' },
+      { name: 'מיחם חשמלי', qty: 1, unit: 'יח׳', price: 150, category: 'כלי בית', durable: true, warranty_months: 12 }] }, error: null }) },
   };
 }
