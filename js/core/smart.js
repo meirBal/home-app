@@ -158,3 +158,16 @@ export async function afterToggle(mod, r) {
     return 'המלאי עודכן';
   }
 }
+
+// ---- [Debt checks: newest row per provider; attention = never checked, stale, or unpaid debt] ----
+export const DEBT_PROVIDERS = [{ id: 'iec', title: 'חשמל', icon: '⚡' }];   // next: water (מי אשקלון), tuition (HIT)
+export const DEBT_CHECK_DAYS = 10;                                     // ≈3 checks a month
+export const latestByProvider = (rows) => {
+  const m = new Map();
+  for (const r of rows) if (!m.has(r.data?.provider)) m.set(r.data?.provider, r);   // rows: newest first
+  return m;
+};
+export const debtAttention = (providers, latest, nowMs = Date.now()) => providers.filter((p) => {
+  const r = latest.get(p.id);
+  return !r || (r.amount > 0 && !r.done) || (nowMs - new Date(r.created_at)) / 864e5 >= DEBT_CHECK_DAYS;
+});

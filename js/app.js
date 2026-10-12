@@ -87,7 +87,8 @@ const route = guard(async () => {
   else {
     const mod = state.modules.find((m) => m.id === id && m.enabled !== false);
     if (!mod) return (location.hash = '');
-    await renderModule(view, mod);
+    if (mod.view === 'debts') await (await import('./views/debts.js')).renderDebts(view, mod);
+    else await renderModule(view, mod);
   }
   if (my === seq) { main.replaceChildren(view); if (sub) scrollTo(0, 0); }
 });

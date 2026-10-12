@@ -1,7 +1,7 @@
 // ===== MODULE REGISTRY — every screen is data, so admins can add/edit modules without code =====
 // Field: k=key, l=label, t=type(text|number|money|date|time|select|textarea|check|photo|member),
 //        o=options, req=required, col=stored in real column (due|amount|done)
-// Module: id, title, icon, pin, fields, view(list|calendar|gallery|shopping|warranty), sum=show monthly total,
+// Module: id, title, icon, pin, fields, view(list|calendar|gallery|shopping|warranty|debts), sum=show monthly total,
 //         order=column to sort by, asc
 
 const name = { k: 'name', l: 'שם', t: 'text', req: 1 };
@@ -59,6 +59,7 @@ export const DEFAULTS = [
     { k: 'mood', l: 'מצב רעב', t: 'select', o: ['קליל', 'רעב', 'רעב מאוד'] },
     { k: 'minutes', l: 'דקות הכנה', t: 'number' },
     { k: 'ing', l: 'מצרכים (שורה לכל מצרך)', t: 'textarea' }, { k: 'steps', l: 'אופן הכנה', t: 'textarea' }, photo] },
+  { id: 'debts', title: 'בדיקת חובות', icon: '💰', view: 'debts', enabled: false, fields: [title('ספק')] },
   { id: 'photos', title: 'תמונות', icon: '🖼️', view: 'gallery', fields: [
     { ...photo, req: 1 }, { k: 'caption', l: 'כיתוב', t: 'text' }] },
   { id: 'plans', title: 'תכנון עתידי', icon: '🎯', order: 'due', asc: true, fields: [
@@ -70,7 +71,7 @@ export function resolve(settings = {}) {
   const ov = new Map((settings.modules || []).map((m) => [m.id, m]));
   // overrides saved by older versions keep their fields, and gain fields added to the default since
   const merged = DEFAULTS.map((d) => {
-    const o = ov.get(d.id), m = { ...d, enabled: true, ...o };
+    const o = ov.get(d.id), m = { enabled: true, ...d, ...o };   // d.enabled:false = opt-in module
     if (o?.fields) m.fields = [...o.fields, ...d.fields.filter((f) => !o.fields.some((x) => x.k === f.k))];
     return m;
   });

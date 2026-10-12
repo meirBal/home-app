@@ -127,6 +127,22 @@ await step('more grid + admin', async () => {
   await page.goto(url + '#/calendar'); await page.goto(url + '#/expenses'); await page.goto(url + '#/recipes'); await page.goto(url + '#/photos');
   await page.waitForTimeout(400);
 });
+await step('debts: home reminder → ID check digit → code → debt saved', async () => {
+  await page.goto(url + '#/home'); await page.getByText('הגיע הזמן לבדוק: חשמל').click();
+  await page.getByRole('button', { name: 'בדוק חשמל' }).click();
+  await page.locator('dialog input').first().fill('123456789');
+  await page.getByRole('button', { name: 'שלח לי קוד' }).click();
+  await page.getByText('מספר הזהות לא תקין').waitFor();             // bad check digit → no code sent
+  const i = errors.findIndex((e) => e.includes('מספר הזהות לא תקין'));       // expected, shown as toast
+  if (i < 0) throw new Error('no validation error'); errors.splice(i, 1);
+  await page.locator('dialog input').first().fill('123456782');
+  await page.getByRole('button', { name: 'שלח לי קוד' }).click();
+  await page.locator('dialog', { hasText: 'קוד אימות' }).locator('input').fill('123456');
+  await page.getByRole('button', { name: 'בדוק', exact: true }).last().click();
+  await page.getByText(/לתשלום.*245/).first().waitFor();
+  await page.getByRole('button', { name: 'שילמתי' }).click(); await page.getByText('סומן כשולם').waitFor();
+  if (!(await page.evaluate(() => window.__db.records.some((r) => r.module === 'debts' && r.done)))) throw new Error('not saved/paid');
+});
 await step('shopping quick add parses qty/unit/aisle', async () => {
   await page.goto(url + '#/shopping');
   await page.locator('.quick input').fill('2 ק"ג מלפפונים');

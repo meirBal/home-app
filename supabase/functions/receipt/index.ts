@@ -55,7 +55,8 @@ async function handle(req: Request) {
   const hid = m?.[0]?.household_id;
   if (!hid) return json({ error: 'אין הרשאה' }, 403);
   const since = new Date(Date.now() - 864e5).toISOString();
-  const { count } = await sb.from('ai_calls').select('id', { count: 'exact', head: true }).eq('household_id', hid).gte('at', since);
+  const { count, error: qe } = await sb.from('ai_calls').select('id', { count: 'exact', head: true }).match({ household_id: hid, kind: 'receipt' }).gte('at', since);
+  if (qe) throw qe;                                                // quota unknown → fail closed
   if ((count ?? 0) >= DAILY_CAP) return json({ error: `הגעתם ל־${DAILY_CAP} סריקות היום — נסו מחר` }, 429);
 
   let image: string, mime: string;

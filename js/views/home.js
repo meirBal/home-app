@@ -1,8 +1,8 @@
 // ===== HOME — today at a glance: tasks, expiry, restock suggestions, dice & receipt shortcuts =====
-import { h, guard, toast, fmtDate, chipText, memberName, today, DICE_SVG, groupBy } from '../core/ui.js';
+import { h, guard, toast, fmtDate, fmtMoney, chipText, memberName, today, DICE_SVG, groupBy } from '../core/ui.js';
 import { records } from '../core/api.js';
 import { TASK_MODULES } from '../core/modules.js';
-import { completeTask, skipTask, expiry, needsRestock, addToShopping, norm, warrantyState } from '../core/smart.js';
+import { completeTask, skipTask, expiry, needsRestock, addToShopping, norm, warrantyState, DEBT_PROVIDERS, latestByProvider, debtAttention } from '../core/smart.js';
 import { packs, packRows } from '../data/seeds.js';
 import { state } from '../core/state.js';
 
@@ -20,12 +20,13 @@ export async function renderHome(root) {
   const until = tmr.toLocaleDateString('sv');
 
   const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString();
-  const [tasks, prods, open, wars, log, ...hasMods] = await Promise.all([
+  const [tasks, prods, open, wars, log, debts, ...hasMods] = await Promise.all([
     records.dueTasks(hid, [...taskMods, ...(mods.has('calendar') ? ['calendar'] : [])], until),
     mods.has('products') ? records.all(hid, 'products') : [],
     mods.has('shopping') ? records.open(hid, 'shopping') : [],
     mods.has('warranty') ? records.between(hid, 'warranty', now, plus(now, 30)) : [],
     taskMods.length ? records.since(hid, 'log', weekAgo) : [],
+    mods.has('debts') ? records.recent(hid, 'debts', 20) : [],
     ...taskMods.map((m) => records.has(hid, m)),
   ]);
   const used = new Set(taskMods.filter((_, i) => hasMods[i]));
@@ -67,6 +68,11 @@ export async function renderHome(root) {
   const score = [...groupBy(log, (l) => l.created_by)].map(([by, ls]) => [memberName(by) || '?', ls.length]).sort((a, b) => b[1] - a[1]);
   if (!ui.pruned) { ui.pruned = true; records.prune(hid, 'log', new Date(Date.now() - 30 * 864e5).toISOString()).then(() => {}, () => {}); }
 
+  // ---- [Debt checks: reminder every DEBT_CHECK_DAYS, or while a debt is unpaid] ----
+  const latest = latestByProvider(debts);
+  const dueDebts = mods.has('debts') ? debtAttention(DEBT_PROVIDERS, latest) : [];
+  const owed = [...latest.values()].filter((r) => r.amount > 0 && !r.done);
+
   const name = memberName(me);
   root.replaceChildren(...[
     h('header', { class: 'bar' }, h('h1', {}, `🏠 ${name ? 'שלום ' + name : state.house.name}`),
@@ -92,6 +98,11 @@ export async function renderHome(root) {
       h('div', { class: 'list' }, ...exp.map((p) => h('a', { class: 'item late', href: '#/products' },
         h('strong', { class: 'grow' }, p.data?.name),
         h('span', { class: `chip ${expiry(p, now)}` }, `${expiry(p, now) === 'expired' ? 'פג' : 'עד'} ${fmtDate(p.due)}`))))),
+
+    dueDebts.length > 0 && h('a', { class: `card item${owed.some((r) => r.data?.overdue > 0) ? ' late' : ''}`, href: '#/debts' },
+      h('strong', { class: 'grow' }, owed.length ? `💰 לתשלום: ${owed.map((r) => `${r.data?.title} ${fmtMoney(r.amount)}${r.due ? ' עד ' + fmtDate(r.due) : ''}`).join(' · ')}`
+        : `💰 הגיע הזמן לבדוק: ${dueDebts.map((p) => p.title).join(', ')}`),
+      h('span', { class: 'chip' }, 'לבדיקה')),
 
     warn.length > 0 && section('🛡️ אחריות שנגמרת בקרוב',
       h('div', { class: 'list' }, ...warn.map(({ w, s }) => h('a', { class: 'item', href: '#/warranty' },

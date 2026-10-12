@@ -47,6 +47,8 @@ export const records = {
   all: (h, module) => sb.from('records').select('id, data, due, amount').match({ household_id: h, module }).limit(2000).then(ok),
   between: (h, module, from, to) => sb.from('records').select('id, data, due').match({ household_id: h, module })
     .gte('due', from).lte('due', to).limit(200).then(ok),
+  recent: (h, module, n) => sb.from('records').select('id, data, due, amount, done, created_at').match({ household_id: h, module })
+    .order('created_at', { ascending: false }).limit(n).then(ok),
   has: async (h, module) => ((await sb.from('records').select('id', { count: 'exact', head: true })
     .match({ household_id: h, module }).limit(1)).count || 0) > 0,
   inUse: async (h, module, k, v) => ((await sb.from('records').select('id', { count: 'exact', head: true })
@@ -74,11 +76,11 @@ export const records = {
   removeDone: (h, module) => wrote(sb.from('records').delete().match({ household_id: h, module, done: true }).then(ok)),
 };
 
-// ---- [Edge functions (AI receipt reader)] ----
+// ---- [Edge functions (receipt reader, debt checks)] ----
 export const fn = async (name, body) => {
   const { data, error } = await sb.functions.invoke(name, { body });
   if (error) {
-    if (error.context?.status === 404) throw new Error('סריקת קבלות עדיין לא הופעלה בשרת');
+    if (error.context?.status === 404) throw new Error('השירות עדיין לא הופעל בשרת');
     let msg = error.message;
     try { msg = (await error.context.json()).error || msg; } catch { /* non-JSON error body */ }
     throw new Error(msg);
