@@ -5,7 +5,7 @@ const CDN = 'cdn-v1';                            // pinned libraries + recipe da
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-192.png', 'fonts/rubik-hebrew.woff2', 'fonts/rubik-latin.woff2',
   'js/app.js', 'js/config.js', 'js/core/api.js', 'js/core/ui.js', 'js/core/modules.js', 'js/core/state.js',
   'js/core/smart.js', 'js/data/seeds.js', 'recipes/lib.js',
-  'js/views/module.js', 'js/views/home.js', 'js/views/dice.js', 'js/views/library.js', 'js/views/receipt.js',
+  'js/views/module.js', 'js/views/home.js', 'js/views/dice.js', 'js/views/library.js', 'js/views/receipt.js', 'js/views/catalog.js',
   'js/views/auth.js', 'js/views/admin.js'];
 const CDN_HOSTS = ['cdn.jsdelivr.net'];
 

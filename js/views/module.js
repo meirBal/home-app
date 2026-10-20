@@ -227,7 +227,9 @@ export async function renderModule(root, mod) {
         btn.disabled = true; rec.start(); toast('🎤 מקשיב… אמרו למשל "חלב, ביצים ולחם"');
       } catch { btn.disabled = false; toast('הקלטה קולית לא זמינה כאן', true); }
     } }, '🎤');
-    return h('form', { class: 'quick', onsubmit: (e) => { e.preventDefault(); add(inp.value); } }, inp, dl, mic,
+    const cat = h('button', { type: 'button', class: 'ghost', 'aria-label': 'קטלוג מוצרים', title: 'קטלוג — בחירה מכל המוצרים',
+      onclick: guard(async () => (await import('./catalog.js')).openCatalog(rows, prods || [])) }, '📋');
+    return h('form', { class: 'quick', onsubmit: (e) => { e.preventDefault(); add(inp.value); } }, cat, inp, dl, mic,
       h('button', { type: 'submit', 'aria-label': 'הוספה' }, '+'));
   }
 

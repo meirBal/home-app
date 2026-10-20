@@ -11,4 +11,6 @@ for (const [a, b, e] of [['חלב', 'חלב 3% תנובה', true], ['חלב', '�
 for (const [n, cat] of [['מרכך כביסה', 'ניקיון'], ['מרכך שיער', 'טואלטיקה'], ['נוזל כלים לימון', 'ניקיון'], ['שמנת מתוקה', 'מוצרי חלב'],
   ['שמן קנולה', 'יבשים ושימורים'], ['פלפל שחור', 'יבשים ושימורים'], ['פלפל אדום', 'ירקות ופירות'], ['קרמבו', null],
   ['חמאת בוטנים', null], ['דגני בוקר', 'יבשים ושימורים'], ['קולה ללא סוכר', 'משקאות']]) eq(guess(n).category, cat, n);
+const { BASICS } = await import('../js/data/seeds.js');            // every catalog basic lands in a real aisle
+for (const [n] of BASICS) eq(!!guess(n).category, true, 'aisle: ' + n);
 console.log(bad ? `${bad} failed` : 'all passed'); process.exit(bad ? 1 : 0);

@@ -163,6 +163,13 @@ details.bought .item { margin-top: 6px; }
   @keyframes up { from { transform: translateY(40px); opacity: 0; } }
 }
 
+/* shopping catalog: tap name to pick, stepper for quantity */
+.item.cat { gap: 6px; padding: 6px 10px; } .item.cat.sel { border-color: var(--acc); box-shadow: inset 3px 0 0 var(--acc); }
+.item.cat .stepper { gap: 2px; } .item.cat .stepper button { width: 40px; min-height: 40px; }
+.item.cat .num { width: 52px; text-align: center; -moz-appearance: textfield; } .item.cat .num::-webkit-inner-spin-button { display: none; }
+@media (max-width: 360px) { .item.cat .body { flex-basis: 100%; } }
+.catalog .search { position: sticky; top: calc(-1 * var(--gap)); z-index: 2; box-shadow: 0 -12px 0 var(--card); } .item.cat select { width: auto; flex: none; }
+
 /* ===== [7] PERFORMANCE MODES ===== */
 .lite .toast, .lite .roll, .lite .pulse, .lite .modal { animation: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }

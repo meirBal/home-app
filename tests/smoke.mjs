@@ -158,6 +158,22 @@ await step('delete with undo restores row', async () => {
   const back = await page.evaluate(() => window.__db.records.some((r) => r.module === 'shopping' && r.data.name === 'מלפפונים'));
   if (!back) throw new Error('not restored');
 });
+await step('catalog: pick with qty, change existing, add new', async () => {
+  await page.goto(url + '#/shopping');
+  await page.getByRole('button', { name: 'קטלוג מוצרים' }).click();
+  const row = (n) => page.locator('dialog .item.cat', { has: page.locator('strong', { hasText: new RegExp(`^${n}$`) }) });
+  await row('מלפפונים').getByRole('button', { name: 'עוד' }).click();          // on list: 2 → 2.5 ק״ג
+  await row('אורז').locator('.body').click();                                   // new: tap = one step (0.5 ק״ג)
+  await page.locator('dialog input[type=search]').fill('קרמבו');
+  await page.getByRole('button', { name: /הוספת "קרמבו"/ }).click();
+  await shot('7-catalog');
+  await page.getByRole('button', { name: /עדכון הרשימה \(3\)/ }).click();
+  await page.waitForTimeout(400);
+  const r = await page.evaluate(() => Object.fromEntries(window.__db.records.filter((x) => x.module === 'shopping' && !x.done
+    && ['מלפפונים', 'אורז', 'קרמבו'].includes(x.data.name)).map((x) => [x.data.name, [x.data.qty, x.data.unit, x.data.category]])));
+  const want = { 'מלפפונים': [2.5, 'ק״ג', 'ירקות ופירות'], 'אורז': [0.5, 'ק״ג', 'יבשים ושימורים'], 'קרמבו': [1, 'יח׳', 'אחר'] };
+  if (JSON.stringify(r, Object.keys(want)) !== JSON.stringify(want, Object.keys(want))) throw new Error(JSON.stringify(r));
+});
 await step('product with warranty → prefilled warranty card → end date', async () => {
   await page.goto(url + '#/products');
   await page.locator('.fab').click();
@@ -177,7 +193,8 @@ await step('product with warranty → prefilled warranty card → end date', asy
 await step('recipe library: browse, scale, add missing', async () => {
   await page.goto(url + '#/library');
   await page.locator('.rcard').first().waitFor({ timeout: 5000 });
-  await page.locator('.rcard', { hasText: 'שקשוקה קלאסית' }).click();
+  await page.locator('input[type=search]').fill('שקשוקה קלאסית');                 // catalogue is paged (grows daily)
+  await page.locator('.rcard', { hasText: 'שקשוקה קלאסית' }).first().click();
   await page.locator('.ing-list li').first().waitFor();
   const before = await page.locator('.ing-list li').first().innerText();
   await page.getByRole('button', { name: 'יותר מנות' }).click();
