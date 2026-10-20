@@ -1,3 +1,7 @@
+## 1.4.0 — 2026-10-20
+- Shopping catalog 📋: every known product + basics by aisle, tap/stepper quantities and units, edit/remove items already on the list (with undo), add new products; 9 review fixes
+- previous: v1.3.0 (rollback: scripts/rollback.sh 1.3.0)
+
 ## 1.3.0 — 2026-10-09
 - Receipt scan: computerized PDF receipts (multi-page), promotions/deposits ignored, durable items skip stock, automatic warranty cards with shared receipt photo, total sanity check; 'כלי בית' aisle; 7 review fixes
 - previous: v1.2.1 (rollback: scripts/rollback.sh 1.2.1)
