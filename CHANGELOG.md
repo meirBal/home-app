@@ -1,3 +1,7 @@
+## 1.6.0 — 2026-10-21
+- Share to the app: receipts (photo/PDF/.mht/.html or copied text) shared from WhatsApp/SMS/Files open straight into scan; retry if the scan fails; 6 review fixes
+- previous: v1.5.0 (rollback: scripts/rollback.sh 1.5.0)
+
 ## 1.5.0 — 2026-10-21
 - Digital receipts: upload saved receipt pages (.mht/.html, e.g. Pairzon/Osher Ad) directly in 'scan receipt' — text extracted on the phone, any Hebrew encoding; 7 review fixes
 - previous: v1.4.0 (rollback: scripts/rollback.sh 1.4.0)
