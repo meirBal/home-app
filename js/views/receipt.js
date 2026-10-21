@@ -23,19 +23,29 @@ export async function scanReceipt(file, text) {
   review(res, file);
 }
 
-// Shared into the app (see sw.js share()): a file → normal scan; shared text (e.g. a copied receipt) → AI as text
-export const fromShare = guard(async () => {
+// Shared into the app (see sw.js share()): a file → normal scan; shared text (e.g. a copied receipt) → AI as text.
+// The parked share is cleared only once the scan worked; on failure the toast offers a retry.
+export async function fromShare() {
   const c = await caches.open('share'), [f, t] = await Promise.all([c.match('file'), c.match('text')]);
-  await Promise.all([c.delete('file'), c.delete('text')]);
-  if (f) return scanReceipt(new File([await f.blob()], decodeURIComponent(f.headers.get('x-name') || '') || 'receipt', { type: f.headers.get('content-type') }));
   const text = (await t?.text())?.trim();
-  if (!text) return;
-  if (text.replace(/https?:\/\/\S+/g, '').trim().length < 50) return toast('קישור לבד לא מספיק — פתחו את הקבלה, שמרו/הורידו אותה ושתפו את הקובץ', true);
-  return scanReceipt(null, text.slice(0, 50000));
-});
+  if (!f && !text) return toast('לא התקבל קובץ (אולי גדול מדי — עד 15MB)', true);
+  if (!f && text.replace(/https?:\/\/\S+/g, '').trim().length < 50) {
+    await c.delete('text');
+    return toast('קישור לבד לא מספיק — פתחו את הקבלה, שמרו/הורידו אותה ושתפו את הקובץ', true);
+  }
+  try {
+    if (f) {
+      const blob = await f.blob(), head = await blob.slice(0, 5).text();
+      let name = decodeURIComponent(f.headers.get('x-name') || ''), type = f.headers.get('content-type');
+      if (!/\.\w{2,5}$/.test(name)) name = head === '%PDF-' ? 'receipt.pdf' : /^\s*(<|from|mime|conte)/i.test(head) ? 'receipt.mht' : 'receipt';   // unnamed: sniff
+      await scanReceipt(new File([blob], name, { type: head === '%PDF-' ? 'application/pdf' : type }));
+    } else await scanReceipt(null, text.slice(0, 50000));
+    await Promise.all([c.delete('file'), c.delete('text')]);
+  } catch (e) { console.warn(e); toast(e.message || 'שגיאה', true, { label: 'נסו שוב', fn: fromShare }); }
+}
 
 // ---- [Digital receipts: saved web page (.mht = MIME archive, or .html) → readable text; far cheaper for the AI than an image] ----
-const isWeb = (f) => /\.(mht|mhtml|html?)$/i.test(f.name || '') || /html|multipart/.test(f.type);
+const isWeb = (f) => /\.(mht|mhtml|html?)$/i.test(f.name || '') || /html|multipart|rfc822/.test(f.type);
 const MAX_HTML = 3e6;                                                   // the receipt page itself; images/fonts after it are skipped
 async function webText(file) {
   const doc = new DOMParser().parseFromString(await webHtml(file), 'text/html');   // inert: no scripts run, no images load

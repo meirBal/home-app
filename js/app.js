@@ -77,12 +77,12 @@ let seq = 0;                                     // drop stale renders when user
 
 const route = guard(async () => {
   if (!state.house) return;
-  const [id, sub] = current().split('/'), my = ++seq;
+  let [id, sub] = current().split('/');
   if (id === 'share') {                                    // receipt shared from another app → home + scan
-    history.replaceState(null, '', '#/home');
+    history.replaceState(null, '', '#/home'); id = 'home';
     import('./views/receipt.js').then((m) => m.fromShare());
-    return route();
   }
+  const my = ++seq;
   nav.querySelectorAll('a').forEach((a) => a.classList.toggle('on', a.dataset.id === id));
   const view = h('div');
   if (id === 'admin' && state.role === 'admin') await (await import('./views/admin.js')).renderAdmin(view);

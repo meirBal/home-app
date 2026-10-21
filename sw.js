@@ -23,7 +23,7 @@ self.addEventListener('activate', (e) => e.waitUntil(
 // Supabase API/storage: always network (never cache user data).
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
-  if (e.request.method === 'POST' && u.pathname.endsWith('/share')) return e.respondWith(share(e.request));
+  if (e.request.method === 'POST' && u.href.split(/[?#]/)[0] === new URL('share', registration.scope).href) return e.respondWith(share(e.request));
   if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co') || u.pathname.includes('/book/')) return; // book/ = separate app
   if (u.origin !== location.origin && !CDN_HOSTS.includes(u.hostname)) return;
   if (u.pathname.includes('/recipes/data/')) {
@@ -46,7 +46,7 @@ self.addEventListener('fetch', (e) => {
 async function share(req) {
   const f = await req.formData().catch(() => null), file = f?.get('file'), c = await caches.open(SHARE);
   await Promise.all([c.delete('file'), c.delete('text')]);
-  if (file?.size) await c.put('file', new Response(file, { headers: { 'content-type': file.type || 'application/octet-stream', 'x-name': encodeURIComponent(file.name || '') } }));
+  if (file?.size > 15e6) { /* too big: nothing parked → app explains */ } else if (file?.size) await c.put('file', new Response(file, { headers: { 'content-type': file.type || 'application/octet-stream', 'x-name': encodeURIComponent(file.name || '') } }));
   else if (f) await c.put('text', new Response(['title', 'text', 'url'].map((k) => f.get(k)).filter(Boolean).join('\n')));
   return Response.redirect('./#/share', 303);
 }
