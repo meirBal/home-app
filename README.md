@@ -19,7 +19,7 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 | `js/views/home.js` | מסך בית: היום ומחר, תוקף, כדאי לקנות, חבילות התחלה |
 | `js/views/dice.js` | 🎲🎲 מתכון לפי ארוחה × רעב × מה שיש בבית (מתוך המאגר + המתכונים שלנו) |
 | `js/views/catalog.js` | קטלוג מוצרים לרשימת הקניות: כל המוצרים המוכרים + בסיס, לפי מעברים, בחירת כמות ויחידה |
-| `js/views/receipt.js` | סריקת קבלה (תמונה או PDF ממוחשב) → אישור → מלאי/קניות/הוצאה/כרטיסי אחריות |
+| `js/views/receipt.js` | סריקת קבלה (תמונה, PDF ממוחשב או קבלה דיגיטלית .mht/.html) → אישור → מלאי/קניות/הוצאה/כרטיסי אחריות |
 | `supabase/functions/receipt` | Edge Function: קבלה → פריטים (Gemini, מכסה יומית למשק בית) |
 | `tests/` | `node tests/smart.test.mjs` · `node tests/smoke.mjs .` (דפדפן + שרת מדומה) |
 | `js/views/module.js` | תצוגה גנרית: רשימה / יומן / גלריה |
