@@ -1,3 +1,7 @@
+## 1.5.0 — 2026-10-21
+- Digital receipts: upload saved receipt pages (.mht/.html, e.g. Pairzon/Osher Ad) directly in 'scan receipt' — text extracted on the phone, any Hebrew encoding; 7 review fixes
+- previous: v1.4.0 (rollback: scripts/rollback.sh 1.4.0)
+
 ## 1.4.0 — 2026-10-20
 - Shopping catalog 📋: every known product + basics by aisle, tap/stepper quantities and units, edit/remove items already on the list (with undo), add new products; 9 review fixes
 - previous: v1.3.0 (rollback: scripts/rollback.sh 1.3.0)
