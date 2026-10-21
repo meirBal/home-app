@@ -1,3 +1,7 @@
+## 1.6.1 — 2026-10-21
+- Shared receipt link: clear instructions to download the receipt and share the file
+- previous: v1.6.0 (rollback: scripts/rollback.sh 1.6.0)
+
 ## 1.6.0 — 2026-10-21
 - Share to the app: receipts (photo/PDF/.mht/.html or copied text) shared from WhatsApp/SMS/Files open straight into scan; retry if the scan fails; 6 review fixes
 - previous: v1.5.0 (rollback: scripts/rollback.sh 1.5.0)
