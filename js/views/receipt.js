@@ -31,7 +31,7 @@ export async function fromShare() {
   if (!f && !text) return toast('לא התקבל קובץ (אולי גדול מדי — עד 15MB)', true);
   if (!f && text.replace(/https?:\/\/\S+/g, '').trim().length < 50) {
     await c.delete('text');
-    return toast('קישור לבד לא מספיק — פתחו את הקבלה, שמרו/הורידו אותה ושתפו את הקובץ', true);
+    return toast('קישור לבד לא מספיק: פתחו אותו, לחצו "להורדת הקבלה" (או ⋮ ← הורדה) ושתפו את הקובץ ל"הבית"', true);
   }
   try {
     if (f) {
