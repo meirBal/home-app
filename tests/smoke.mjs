@@ -143,6 +143,33 @@ await step('digital receipt (.mht, quoted-printable) → text to AI', async () =
   if (!b2.includes('שופרסל דיל\nביצים L 12 יח 1 21.90')) throw new Error(b2);
   await page.keyboard.press('Escape');
 });
+await step('share target: shared file and shared text open the scan', async () => {
+  await page.goto(url + '#/home');
+  const sw = await browser.newPage({ serviceWorkers: 'allow' });           // main page blocks SWs; this one tests the parking
+  await sw.goto(url + 'manifest.json');
+  const parked = await sw.evaluate(async () => {
+    await navigator.serviceWorker.register('./sw.js');
+    if (!navigator.serviceWorker.controller) await new Promise((r) => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
+    const fd = new FormData(); fd.append('file', new File(['x'.repeat(10)], 'r.mht', { type: 'multipart/related' }));
+    const res = await fetch('./share', { method: 'POST', body: fd, redirect: 'manual' });
+    const hit = await (await caches.open('share')).match('file');
+    return [res.type, decodeURIComponent(hit?.headers.get('x-name')), await hit?.text()];
+  });
+  await sw.close();
+  if (JSON.stringify(parked) !== '["opaqueredirect","r.mht","xxxxxxxxxx"]') throw new Error(JSON.stringify(parked));
+  await page.evaluate(async () => {
+    const c = await caches.open('share');
+    await c.put('file', new Response('<html><body><p>רמי לוי</p><p>במבה אסם 80 גרם 1 4.90</p><p>סה"כ 4.90 תודה ולהתראות</p></body></html>', { headers: { 'content-type': 'application/octet-stream', 'x-name': encodeURIComponent('קבלה.mht') } }));
+  });
+  await page.goto(url + '#/share');
+  await page.getByRole('button', { name: 'אישור ועדכון' }).waitFor({ timeout: 4000 });
+  if (!(await page.evaluate(() => window.__fnBody.text)).includes('במבה אסם 80 גרם 1 4.90') || !page.url().endsWith('#/home')) throw new Error('file share');
+  await page.keyboard.press('Escape');
+  await page.evaluate(async () => (await caches.open('share')).put('text', new Response('https://osher.pairzon.com/x.html')));
+  await page.goto(url + '#/share');
+  await page.getByText(/קישור לבד לא מספיק/).waitFor({ timeout: 3000 });
+  if (await page.evaluate(async () => !!(await (await caches.open('share')).match('text')))) throw new Error('share not cleared');
+});
 await step('more grid + admin', async () => {
   await page.goto(url + '#/more'); await page.getByText('כל האזורים').waitFor();
   await page.goto(url + '#/admin'); await page.getByText('מודולים').waitFor();

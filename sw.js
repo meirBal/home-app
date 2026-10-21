@@ -8,6 +8,7 @@ const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-1
   'js/views/module.js', 'js/views/home.js', 'js/views/dice.js', 'js/views/library.js', 'js/views/receipt.js', 'js/views/catalog.js',
   'js/views/auth.js', 'js/views/admin.js'];
 const CDN_HOSTS = ['cdn.jsdelivr.net'];
+const SHARE = 'share';                           // one shared receipt waiting for the app (survives releases)
 
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))));
 
@@ -15,13 +16,14 @@ self.addEventListener('message', (e) => { if (e.data === 'skip') self.skipWaitin
 
 // Old app caches are dropped; the pinned-CDN cache survives releases (library only changes when the pin does).
 self.addEventListener('activate', (e) => e.waitUntil(
-  caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE && k !== CDN).map((k) => caches.delete(k))))
+  caches.keys().then((ks) => Promise.all(ks.filter((k) => ![CACHE, CDN, SHARE].includes(k)).map((k) => caches.delete(k))))
     .then(() => self.clients.claim())));
 
 // App shell + pinned CDN: cache-first. Recipe data: network-first with a 2.5s budget (grows daily), cache as fallback.
 // Supabase API/storage: always network (never cache user data).
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
+  if (e.request.method === 'POST' && u.pathname.endsWith('/share')) return e.respondWith(share(e.request));
   if (e.request.method !== 'GET' || u.hostname.endsWith('supabase.co') || u.pathname.includes('/book/')) return; // book/ = separate app
   if (u.origin !== location.origin && !CDN_HOSTS.includes(u.hostname)) return;
   if (u.pathname.includes('/recipes/data/')) {
@@ -39,3 +41,12 @@ self.addEventListener('fetch', (e) => {
     return res;
   })));
 });
+
+// Share target (manifest): a receipt shared from WhatsApp/SMS/Files is parked in a cache, then the app opens #/share to scan it.
+async function share(req) {
+  const f = await req.formData().catch(() => null), file = f?.get('file'), c = await caches.open(SHARE);
+  await Promise.all([c.delete('file'), c.delete('text')]);
+  if (file?.size) await c.put('file', new Response(file, { headers: { 'content-type': file.type || 'application/octet-stream', 'x-name': encodeURIComponent(file.name || '') } }));
+  else if (f) await c.put('text', new Response(['title', 'text', 'url'].map((k) => f.get(k)).filter(Boolean).join('\n')));
+  return Response.redirect('./#/share', 303);
+}

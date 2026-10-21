@@ -10,18 +10,29 @@ const pickFile = () => new Promise((res) => {
   inp.click();
 });
 
-export async function scanReceipt() {
-  const file = await pickFile();
-  if (!file) return;
+export async function scanReceipt(file, text) {
+  if (!text) file ||= await pickFile();
+  if (!file && !text) return;
   const wait = modal('קורא את הקבלה…', h('p', { class: 'hint pulse' }, '🧾 זה לוקח כמה שניות'));
   let res;
   try {
-    if (isWeb(file)) res = await fn('receipt', { text: await webText(file) });
+    if (text || isWeb(file)) res = await fn('receipt', { text: text || await webText(file) });
     else { const { data, mime } = await photos.base64(file); res = await fn('receipt', { image: data, mime }); }
   } finally { wait.close(); }
   if (!res?.items?.length) throw new Error('לא נמצאו פריטים בקבלה');
   review(res, file);
 }
+
+// Shared into the app (see sw.js share()): a file → normal scan; shared text (e.g. a copied receipt) → AI as text
+export const fromShare = guard(async () => {
+  const c = await caches.open('share'), [f, t] = await Promise.all([c.match('file'), c.match('text')]);
+  await Promise.all([c.delete('file'), c.delete('text')]);
+  if (f) return scanReceipt(new File([await f.blob()], decodeURIComponent(f.headers.get('x-name') || '') || 'receipt', { type: f.headers.get('content-type') }));
+  const text = (await t?.text())?.trim();
+  if (!text) return;
+  if (text.replace(/https?:\/\/\S+/g, '').trim().length < 50) return toast('קישור לבד לא מספיק — פתחו את הקבלה, שמרו/הורידו אותה ושתפו את הקובץ', true);
+  return scanReceipt(null, text.slice(0, 50000));
+});
 
 // ---- [Digital receipts: saved web page (.mht = MIME archive, or .html) → readable text; far cheaper for the AI than an image] ----
 const isWeb = (f) => /\.(mht|mhtml|html?)$/i.test(f.name || '') || /html|multipart/.test(f.type);
@@ -135,7 +146,7 @@ async function apply(items, res, total, opt, file) {
     data: { title: `קניות${res.store ? ' ב' + res.store : ''}`, category: 'קניות שבועיות' } });
   const war = opt.warranty && on('warranty') ? items.filter((it) => it.months) : [];
   if (war.length) {
-    const receipt = isPdf(file) || isWeb(file) ? undefined : await photos.upload(hid, file);  // one shared receipt photo
+    const receipt = !file || isPdf(file) || isWeb(file) ? undefined : await photos.upload(hid, file);  // one shared receipt photo
     const cat = (c) => (WARRANTY_CATS.includes(c) ? c : 'מוצרי חשמל לבית');
     try {
       await records.insertMany(war.map((it) => ({ household_id: hid, module: 'warranty', amount: it.price, due: warrantyEnd(date, it.months),
