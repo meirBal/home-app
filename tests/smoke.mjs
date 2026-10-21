@@ -125,7 +125,7 @@ await step('digital receipt (.mht, quoted-printable) → text to AI', async () =
   await page.goto(url + '#/home');
   const qp = (t) => [...Buffer.from(t)].map((b) => (b > 126 || b === 61 ? '=' + b.toString(16).toUpperCase().padStart(2, '0') : String.fromCharCode(b))).join('');
   const html = '<html><head><style>.x{}</style><script>var junk=1</script></head><body><!-- <p>Other jacket 620</p> --><table>'
-    + '<tr><td>חלב 3% תנובה</td><td>1</td><td>₪ 7.20</td></tr><tr><td>טחינה אחוה 1 ק"ג</td><td>2</td><td>₪ 36.00</td></tr></table><div>סכום לתשלום ₪ 43.20</div></body></html>';
+    + '<tr>\n  <td>\n    חלב 3% תנובה\n  </td>\n  <td>1</td><td>₪ 7.20</td></tr><tr><td>טחינה אחוה 1 ק"ג</td><td>2</td><td>₪ 36.00</td></tr></table><div>סכום לתשלום ₪ 43.20</div></body></html>';
   const mht = 'From: <Saved by Blink>\r\nContent-Type: multipart/related;\r\n\ttype="text/html";\r\n\tboundary="----B--x"\r\n\r\n------B--x\r\n'
     + 'Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n' + qp(html) + '\r\n------B--x\r\nContent-Type: text/css\r\n\r\n.a{}\r\n------B--x--\r\n';
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: /סריקת קבלה/ }).click()]);
@@ -133,6 +133,14 @@ await step('digital receipt (.mht, quoted-printable) → text to AI', async () =
   await page.getByRole('button', { name: 'אישור ועדכון' }).waitFor({ timeout: 4000 });
   const b = await page.evaluate(() => window.__fnBody);
   if (b.image || !b.text.includes('חלב 3% תנובה 1 ₪ 7.20') || !b.text.includes('טחינה אחוה 1 ק"ג') || /junk|jacket|\.x\{/.test(b.text)) throw new Error(JSON.stringify(b));
+  await page.keyboard.press('Escape');
+  // plain .html saved in windows-1255 (Hebrew letters 0xE0–0xFA), charset from <meta>
+  const cp = (t) => Buffer.from([...t].map((c) => (c >= 'א' && c <= 'ת' ? c.charCodeAt(0) - 0x5D0 + 0xE0 : c.charCodeAt(0))));
+  const [ch2] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: /סריקת קבלה/ }).click()]);
+  await ch2.setFiles({ name: 'r.html', mimeType: 'text/html', buffer: cp('<html><head><meta charset="windows-1255"></head><body><p>שופרסל דיל</p><p>ביצים L 12 יח 1 21.90</p><p>סה"כ לתשלום 21.90 שקלים</p></body></html>') });
+  await page.getByRole('button', { name: 'אישור ועדכון' }).waitFor({ timeout: 4000 });
+  const b2 = await page.evaluate(() => window.__fnBody.text);
+  if (!b2.includes('שופרסל דיל\nביצים L 12 יח 1 21.90')) throw new Error(b2);
   await page.keyboard.press('Escape');
 });
 await step('more grid + admin', async () => {

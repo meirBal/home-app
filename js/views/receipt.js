@@ -6,7 +6,7 @@ import { UNITS, WARRANTY_CATS } from '../core/modules.js';
 import { state } from '../core/state.js';
 
 const pickFile = () => new Promise((res) => {
-  const inp = h('input', { type: 'file', accept: 'image/*,application/pdf,.mht,.mhtml,.html,.htm,multipart/related,message/rfc822,text/html', onchange: () => res(inp.files[0] || null), oncancel: () => res(null) });
+  const inp = h('input', { type: 'file', accept: 'image/*,application/pdf,.mht,.mhtml,.html,.htm,multipart/related,text/html', onchange: () => res(inp.files[0] || null), oncancel: () => res(null) });
   inp.click();
 });
 
@@ -24,34 +24,50 @@ export async function scanReceipt() {
 }
 
 // ---- [Digital receipts: saved web page (.mht = MIME archive, or .html) → readable text; far cheaper for the AI than an image] ----
-const isWeb = (f) => /\.(mht|mhtml|html?)$/i.test(f.name || '') || /html|multipart|rfc822/.test(f.type);
+const isWeb = (f) => /\.(mht|mhtml|html?)$/i.test(f.name || '') || /html|multipart/.test(f.type);
+const MAX_HTML = 3e6;                                                   // the receipt page itself; images/fonts after it are skipped
 async function webText(file) {
-  if (file.size > 10e6) throw new Error('הקובץ גדול מדי');
-  const raw = await file.text();
-  const doc = new DOMParser().parseFromString(mhtHtml(raw) ?? raw, 'text/html');
+  const doc = new DOMParser().parseFromString(await webHtml(file), 'text/html');   // inert: no scripts run, no images load
   doc.querySelectorAll('script,style,noscript,svg,template,select,input,button').forEach((n) => n.remove());
+  const w = doc.createTreeWalker(doc.body || doc, NodeFilter.SHOW_TEXT);   // source indentation is not a line break
+  for (let n; (n = w.nextNode());) n.data = n.data.replace(/\s+/g, ' ');
   doc.querySelectorAll('br,p,div,tr,li,h1,h2,h3,h4,h5,h6,table').forEach((n) => n.after('\n'));
   doc.querySelectorAll('td,th').forEach((n) => n.after(' '));
   const text = (doc.title + '\n' + (doc.body?.textContent || '')).split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
   if (text.length < 50) throw new Error('לא נמצא טקסט של קבלה בקובץ');
   return text.slice(0, 50000);
 }
-// first text/html part of a MIME archive, decoded (binary / quoted-printable / base64 + charset); null if not an archive
-function mhtHtml(raw) {
-  const b = raw.match(/boundary="?([^"\r\n;]+)"?/i);
-  if (!b) return null;
-  for (const part of raw.split('--' + b[1])) {
-    const i = part.search(/\r?\n\r?\n/);
-    const head = part.slice(0, i), body = part.slice(i).trim();
-    if (i < 0 || !/content-type:\s*text\/html/i.test(head)) continue;
+// bytes as a 1-char-per-byte string (exact, unlike file.text()) → first text/html part of a MIME archive, or the whole .html;
+// decoded by declared charset (part header or <meta>), so windows-1255 receipts survive
+async function webHtml(file) {
+  const u8 = new Uint8Array(await file.slice(0, 20e6).arrayBuffer());
+  let raw = '';
+  for (let i = 0; i < u8.length; i += 0x8000) raw += String.fromCharCode(...u8.subarray(i, i + 0x8000));
+  let body = raw, cs;
+  const top = raw.slice(0, Math.max(0, raw.search(/\r?\n\r?\n/)));      // boundary only from the archive's own headers
+  const b = /^(from|mime-version|content-type|subject|date|snapshot)/im.test(top) && top.match(/boundary="?([^"\r\n;]+)"?/i);
+  if (b) {
+    const sep = '--' + b[1];
+    let at = raw.indexOf(sep), part;
+    for (; at >= 0; at = raw.indexOf(sep, at + sep.length)) {
+      const end = raw.indexOf(sep, at + sep.length);
+      part = raw.slice(at + sep.length, end < 0 ? undefined : end);
+      if (/^\s*content-type:\s*text\/html/im.test(part.slice(0, part.search(/\r?\n\r?\n/)))) break;
+      part = null;
+    }
+    if (!part) throw new Error('לא נמצא דף קבלה בקובץ');
+    const i = part.search(/\r?\n\r?\n/), head = part.slice(0, i);
+    body = part.slice(i).trim();
+    cs = head.match(/charset="?([\w-]+)/i)?.[1];
     const enc = head.match(/content-transfer-encoding:\s*([\w-]+)/i)?.[1].toLowerCase();
-    const cs = head.match(/charset="?([\w-]+)/i)?.[1] || 'utf-8';
-    const bytes = (s) => { try { return new TextDecoder(cs).decode(Uint8Array.from(s, (c) => c.charCodeAt(0))); } catch { return s; } };
-    if (enc === 'base64') return bytes(atob(body.replace(/\s/g, '')));
-    if (enc === 'quoted-printable') return bytes(body.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/gi, (_, x) => String.fromCharCode(parseInt(x, 16))));
-    return body;                                                      // 'binary'/'8bit': already text
+    if (enc === 'base64') body = atob(body.replace(/\s/g, ''));
+    else if (enc === 'quoted-printable') body = body.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/gi, (_, x) => String.fromCharCode(parseInt(x, 16)));
   }
-  return null;
+  if (body.length > MAX_HTML) throw new Error('הקובץ גדול מדי');
+  cs ||= body.slice(0, 4000).match(/<meta[^>]+charset=["']?([\w-]+)/i)?.[1] || 'utf-8';
+  let dec;
+  try { dec = new TextDecoder(cs); } catch { throw new Error(`קידוד לא נתמך: ${cs}`); }
+  return dec.decode(Uint8Array.from(body, (c) => c.charCodeAt(0)));
 }
 
 const unitOf = (u) => {
