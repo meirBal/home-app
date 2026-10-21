@@ -121,6 +121,20 @@ await step('receipt review + apply', async () => {
   }));
   if (r.milk.length !== 1 || !r.bread || r.exp !== 192.5 || JSON.stringify(r.war) !== '[[12,true,true]]' || r.urn) throw new Error(JSON.stringify(r));
 });
+await step('digital receipt (.mht, quoted-printable) → text to AI', async () => {
+  await page.goto(url + '#/home');
+  const qp = (t) => [...Buffer.from(t)].map((b) => (b > 126 || b === 61 ? '=' + b.toString(16).toUpperCase().padStart(2, '0') : String.fromCharCode(b))).join('');
+  const html = '<html><head><style>.x{}</style><script>var junk=1</script></head><body><!-- <p>Other jacket 620</p> --><table>'
+    + '<tr><td>חלב 3% תנובה</td><td>1</td><td>₪ 7.20</td></tr><tr><td>טחינה אחוה 1 ק"ג</td><td>2</td><td>₪ 36.00</td></tr></table><div>סכום לתשלום ₪ 43.20</div></body></html>';
+  const mht = 'From: <Saved by Blink>\r\nContent-Type: multipart/related;\r\n\ttype="text/html";\r\n\tboundary="----B--x"\r\n\r\n------B--x\r\n'
+    + 'Content-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n' + qp(html) + '\r\n------B--x\r\nContent-Type: text/css\r\n\r\n.a{}\r\n------B--x--\r\n';
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.getByRole('button', { name: /סריקת קבלה/ }).click()]);
+  await chooser.setFiles({ name: 'Receipt.mht', mimeType: '', buffer: Buffer.from(mht) });
+  await page.getByRole('button', { name: 'אישור ועדכון' }).waitFor({ timeout: 4000 });
+  const b = await page.evaluate(() => window.__fnBody);
+  if (b.image || !b.text.includes('חלב 3% תנובה 1 ₪ 7.20') || !b.text.includes('טחינה אחוה 1 ק"ג') || /junk|jacket|\.x\{/.test(b.text)) throw new Error(JSON.stringify(b));
+  await page.keyboard.press('Escape');
+});
 await step('more grid + admin', async () => {
   await page.goto(url + '#/more'); await page.getByText('כל האזורים').waitFor();
   await page.goto(url + '#/admin'); await page.getByText('מודולים').waitFor();

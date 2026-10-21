@@ -1,4 +1,4 @@
-// ===== RECEIPT SCAN 🧾 — photo/PDF → AI items → review → stock + shopping list + expense + warranty cards =====
+// ===== RECEIPT SCAN 🧾 — photo/PDF/digital receipt (.mht/.html) → AI items → review → stock + shopping list + expense + warranty cards =====
 import { h, guard, modal, toast, today, fmtMoney } from '../core/ui.js';
 import { records, photos, fn, isPdf } from '../core/api.js';
 import { restock, similar, warrantyEnd } from '../core/smart.js';
@@ -6,7 +6,7 @@ import { UNITS, WARRANTY_CATS } from '../core/modules.js';
 import { state } from '../core/state.js';
 
 const pickFile = () => new Promise((res) => {
-  const inp = h('input', { type: 'file', accept: 'image/*,application/pdf', onchange: () => res(inp.files[0] || null), oncancel: () => res(null) });
+  const inp = h('input', { type: 'file', accept: 'image/*,application/pdf,.mht,.mhtml,.html,.htm,multipart/related,message/rfc822,text/html', onchange: () => res(inp.files[0] || null), oncancel: () => res(null) });
   inp.click();
 });
 
@@ -15,9 +15,43 @@ export async function scanReceipt() {
   if (!file) return;
   const wait = modal('קורא את הקבלה…', h('p', { class: 'hint pulse' }, '🧾 זה לוקח כמה שניות'));
   let res;
-  try { const { data, mime } = await photos.base64(file); res = await fn('receipt', { image: data, mime }); } finally { wait.close(); }
+  try {
+    if (isWeb(file)) res = await fn('receipt', { text: await webText(file) });
+    else { const { data, mime } = await photos.base64(file); res = await fn('receipt', { image: data, mime }); }
+  } finally { wait.close(); }
   if (!res?.items?.length) throw new Error('לא נמצאו פריטים בקבלה');
   review(res, file);
+}
+
+// ---- [Digital receipts: saved web page (.mht = MIME archive, or .html) → readable text; far cheaper for the AI than an image] ----
+const isWeb = (f) => /\.(mht|mhtml|html?)$/i.test(f.name || '') || /html|multipart|rfc822/.test(f.type);
+async function webText(file) {
+  if (file.size > 10e6) throw new Error('הקובץ גדול מדי');
+  const raw = await file.text();
+  const doc = new DOMParser().parseFromString(mhtHtml(raw) ?? raw, 'text/html');
+  doc.querySelectorAll('script,style,noscript,svg,template,select,input,button').forEach((n) => n.remove());
+  doc.querySelectorAll('br,p,div,tr,li,h1,h2,h3,h4,h5,h6,table').forEach((n) => n.after('\n'));
+  doc.querySelectorAll('td,th').forEach((n) => n.after(' '));
+  const text = (doc.title + '\n' + (doc.body?.textContent || '')).split('\n').map((l) => l.replace(/\s+/g, ' ').trim()).filter(Boolean).join('\n');
+  if (text.length < 50) throw new Error('לא נמצא טקסט של קבלה בקובץ');
+  return text.slice(0, 50000);
+}
+// first text/html part of a MIME archive, decoded (binary / quoted-printable / base64 + charset); null if not an archive
+function mhtHtml(raw) {
+  const b = raw.match(/boundary="?([^"\r\n;]+)"?/i);
+  if (!b) return null;
+  for (const part of raw.split('--' + b[1])) {
+    const i = part.search(/\r?\n\r?\n/);
+    const head = part.slice(0, i), body = part.slice(i).trim();
+    if (i < 0 || !/content-type:\s*text\/html/i.test(head)) continue;
+    const enc = head.match(/content-transfer-encoding:\s*([\w-]+)/i)?.[1].toLowerCase();
+    const cs = head.match(/charset="?([\w-]+)/i)?.[1] || 'utf-8';
+    const bytes = (s) => { try { return new TextDecoder(cs).decode(Uint8Array.from(s, (c) => c.charCodeAt(0))); } catch { return s; } };
+    if (enc === 'base64') return bytes(atob(body.replace(/\s/g, '')));
+    if (enc === 'quoted-printable') return bytes(body.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/gi, (_, x) => String.fromCharCode(parseInt(x, 16))));
+    return body;                                                      // 'binary'/'8bit': already text
+  }
+  return null;
 }
 
 const unitOf = (u) => {
@@ -85,7 +119,7 @@ async function apply(items, res, total, opt, file) {
     data: { title: `קניות${res.store ? ' ב' + res.store : ''}`, category: 'קניות שבועיות' } });
   const war = opt.warranty && on('warranty') ? items.filter((it) => it.months) : [];
   if (war.length) {
-    const receipt = isPdf(file) ? undefined : await photos.upload(hid, file);  // one shared receipt photo
+    const receipt = isPdf(file) || isWeb(file) ? undefined : await photos.upload(hid, file);  // one shared receipt photo
     const cat = (c) => (WARRANTY_CATS.includes(c) ? c : 'מוצרי חשמל לבית');
     try {
       await records.insertMany(war.map((it) => ({ household_id: hid, module: 'warranty', amount: it.price, due: warrantyEnd(date, it.months),

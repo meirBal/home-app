@@ -64,7 +64,7 @@ export function createClient() {
     channel: () => { const c = { on: () => c, subscribe: () => c }; return c; },
     removeChannel() {},
     storage: { from: () => ({ createSignedUrls: async (ps) => ({ data: ps.map((p) => ({ path: p, signedUrl: 'data:,' })), error: null }), upload: async () => ({ data: {}, error: null }), remove: async () => ({}) }) },
-    functions: { invoke: async () => ({ data: { store: 'שופרסל', date: today, total: 192.5, items: [
+    functions: { invoke: async (n, o) => (window.__fnBody = o?.body, { data: { store: 'שופרסל', date: today, total: 192.5, items: [
       { name: 'חלב 3% תנובה', qty: 2, unit: 'ליטר', price: 13.8, category: 'מוצרי חלב' },
       { name: 'לחם אחיד', qty: 1, unit: 'יח׳', price: 8.7, category: 'מאפים' },
       { name: 'מרכך כביסה', qty: 1, unit: 'יח׳', price: 20, category: 'ניקיון' },
