@@ -1,3 +1,7 @@
+## 1.7.0 — 2026-11-05
+- Forgot password: reset email from the login screen, new-password screen when opening the email link
+- previous: v1.6.1 (rollback: scripts/rollback.sh 1.6.1)
+
 ## 1.6.1 — 2026-10-21
 - Shared receipt link: clear instructions to download the receipt and share the file
 - previous: v1.6.0 (rollback: scripts/rollback.sh 1.6.0)
