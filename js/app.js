@@ -5,7 +5,7 @@ import { resolve } from './core/modules.js';
 import { state } from './core/state.js';
 import { renderModule } from './views/module.js';
 import { renderHome } from './views/home.js';
-import { renderLogin, renderOnboard } from './views/auth.js';
+import { renderLogin, renderOnboard, renderNewPassword } from './views/auth.js';
 import { LITE, VERSION } from './config.js';
 
 const app = $('#app');
@@ -15,6 +15,7 @@ if (LITE) document.documentElement.classList.add('lite');   // weak device: ligh
 async function boot() {
   state.user = await auth.user();
   if (!state.user) return renderLogin(app, boot);
+  if (auth.recovery) return renderNewPassword(app, boot);
   const m = await house.mine(state.user.id);
   if (!m) return renderOnboard(app, boot);
   state.house = m.households;

@@ -26,7 +26,27 @@ export function renderLogin(root, done) {
       signup = !signup;
       form.querySelector('[type=submit]').textContent = signup ? 'הרשמה' : 'כניסה';
       e.target.textContent = signup ? 'יש לי חשבון' : 'משתמש חדש? הרשמה';
-    } }, 'משתמש חדש? הרשמה'));
+    } }, 'משתמש חדש? הרשמה'),
+    h('button', { type: 'button', class: 'ghost', onclick: guard(async () => {
+      const email = form.email.value.trim();
+      if (!email) return toast('נא להזין קודם את המייל');
+      await auth.resetEmail(email);
+      toast('נשלח מייל לאיפוס סיסמה');
+    }) }, 'שכחתי סיסמה'));
+  root.replaceChildren(h('main', { class: 'center' }, form));
+}
+
+// Opened from the reset email: Supabase already signed the user in, just set the new password
+export function renderNewPassword(root, done) {
+  const form = h('form', { class: 'form card', onsubmit: he(async (f) => {
+    await auth.setPassword(f.pw.value);
+    auth.recovery = false;
+    toast('הסיסמה עודכנה ✓');
+    done();
+  }) },
+    h('h1', {}, '🔑 סיסמה חדשה'),
+    h('label', {}, h('span', {}, 'סיסמה חדשה'), h('input', { name: 'pw', type: 'password', required: true, minLength: 8, autocomplete: 'new-password' })),
+    h('button', { type: 'submit' }, 'שמירה'));
   root.replaceChildren(h('main', { class: 'center' }, form));
 }
 

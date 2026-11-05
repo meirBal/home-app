@@ -2,6 +2,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
 import { SUPABASE_URL, SUPABASE_KEY, PAGE, IMG_MAX } from '../config.js';
 
+const RECOVERY = /type=recovery/.test(location.hash);  // read before supabase-js consumes the reset link's hash
 export const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 const ok = ({ data, error }) => { if (error) throw error; return data; };
 let lastWrite = 0;                                   // used to ignore realtime echo of our own writes
@@ -13,6 +14,9 @@ export const auth = {
   signIn: (email, password) => sb.auth.signInWithPassword({ email, password }).then(ok),
   signUp: (email, password) => sb.auth.signUp({ email, password }).then(ok),
   signOut: () => sb.auth.signOut(),
+  recovery: RECOVERY,                                  // true when opened from a password-reset email
+  resetEmail: (email) => sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname }).then(ok),
+  setPassword: (password) => sb.auth.updateUser({ password }).then(ok),
 };
 
 // ---- [Household & members] ----
