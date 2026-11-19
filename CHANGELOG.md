@@ -1,3 +1,7 @@
+## 1.9.1 — 2026-11-19
+- Recipes: '🕯️ לשבת קודש' collection (181 recipes, also linked from the Shabbat screen); default challah is now airy and not sweet; hafrashat challah note corrected; 3 review fixes
+- previous: v1.9.0 (rollback: scripts/rollback.sh 1.9.0)
+
 ## 1.9.0 — 2026-11-19
 - Shabbat prep 🕯️: challah recipe with editable steps/ingredients; ⏰ per step = alarm pushed by the server (rings with the app closed); ingredients → shopping list with 'have it' check; home card Wed→Fri 20:00; shopping categories fixed (olives, snacks); 12 review fixes
 - previous: v1.8.0 (rollback: scripts/rollback.sh 1.8.0)
