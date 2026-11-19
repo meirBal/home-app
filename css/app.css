@@ -180,6 +180,10 @@ details.bought .item { margin-top: 6px; }
 .rec { min-height: 40px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--bg); color: inherit; }
 .rec.need { border-color: var(--acc); color: var(--acc); font-weight: 600; }
 
+/* shabbat prep */
+.shabbat-card { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-decoration: none; color: inherit; border-color: var(--acc); }
+.steps.shab li { cursor: default; } .steps.shab .row { margin-top: 6px; } .cd { font-variant-numeric: tabular-nums; color: var(--acc); }
+
 /* ===== [7] PERFORMANCE MODES ===== */
 .lite .toast, .lite .roll, .lite .pulse, .lite .modal { animation: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }

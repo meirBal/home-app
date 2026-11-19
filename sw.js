@@ -5,7 +5,7 @@ const CDN = 'cdn-v1';                            // pinned libraries + recipe da
 const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.json', 'icons/icon-192.png', 'fonts/rubik-hebrew.woff2', 'fonts/rubik-latin.woff2',
   'js/app.js', 'js/config.js', 'js/core/api.js', 'js/core/ui.js', 'js/core/modules.js', 'js/core/state.js',
   'js/core/smart.js', 'js/data/seeds.js', 'recipes/lib.js',
-  'js/views/module.js', 'js/views/home.js', 'js/views/dice.js', 'js/views/library.js', 'js/views/receipt.js', 'js/views/catalog.js',
+  'js/views/module.js', 'js/views/home.js', 'js/views/dice.js', 'js/views/library.js', 'js/views/receipt.js', 'js/views/catalog.js', 'js/views/shabbat.js', 'js/data/challah.js',
   'js/views/auth.js', 'js/views/admin.js'];
 const CDN_HOSTS = ['cdn.jsdelivr.net'];
 const SHARE = 'share';                           // one shared receipt waiting for the app (survives releases)
@@ -50,3 +50,17 @@ async function share(req) {
   else if (f) await c.put('text', new Response(['title', 'text', 'url'].map((k) => f.get(k)).filter(Boolean).join('\n')));
   return Response.redirect('./#/share', 303);
 }
+
+// Alarms (timers set in the app; sent by the server at the right minute — see supabase/functions/alarm)
+self.addEventListener('push', (e) => {
+  const d = e.data?.json() ?? {};
+  e.waitUntil(self.registration.showNotification(d.title || 'ניהול הבית', { body: d.body || '', tag: d.tag, renotify: true,
+    requireInteraction: true, vibrate: [500, 250, 500, 250, 500], icon: 'icons/icon-192.png', data: { url: d.url || './' } }));
+});
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || './', self.registration.scope).href;
+  e.waitUntil(clients.matchAll({ type: 'window' })
+    .then((ws) => (ws[0] ? ws[0].focus().then((w) => w.navigate(url)) : clients.openWindow(url)))
+    .catch(() => clients.openWindow(url)));
+});

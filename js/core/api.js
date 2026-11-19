@@ -90,6 +90,27 @@ export const fn = async (name, body) => {
   return data;
 };
 
+// ---- [Alarms: a timer becomes a server push (pg_cron → edge fn 'alarm'), so it rings even with the app closed] ----
+const VAPID = 'BGqmEpQHwvDEXD9X5wpcbmuLUFe_0lGojHmijB4ky-ajBYdW87J7qhz-h0cEdiuuFpdQB2sveAbRcvrmLJKZowo';
+const b64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+export const alarms = {
+  // call from a tap (permission prompt); false = this phone can't get pushes (then the timer rings in-app only)
+  enable: async (h, uid) => {
+    if (!('PushManager' in window) || !navigator.serviceWorker?.controller) return false;
+    if (await Notification.requestPermission() !== 'granted') return false;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(VAPID) });
+    const j = sub.toJSON();
+    const known = ok(await sb.from('records').select('id').match({ household_id: h, module: 'push', created_by: uid }).eq('data->>endpoint', j.endpoint).limit(1));
+    if (!known.length) ok(await wrote(sb.from('records').insert({ household_id: h, module: 'push', data: { endpoint: j.endpoint, sub: j } })));
+    return true;
+  },
+  set: (h, at, title, ref) => wrote(sb.from('records').insert({ household_id: h, module: 'alarm', data: { at: at.toISOString(), title, ref } })
+    .select('id, data').single().then(ok)),
+  mine: (h, uid) => sb.from('records').select('id, data').match({ household_id: h, module: 'alarm', done: false, created_by: uid }).then(ok),
+  cancel: (id) => wrote(sb.from('records').delete().eq('id', id).then(ok)),
+};
+
 // ---- [Feature requests → feed for the improvement loop] ----
 export const requests = {
   list: (h) => sb.from('feature_requests').select('id, text, status, created_at')

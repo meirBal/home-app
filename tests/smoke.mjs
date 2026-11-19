@@ -37,6 +37,11 @@ const text = () => page.locator('#view').innerText();
 
 await page.goto(url);
 await step('home renders', async () => { await page.getByText('מה מבשלים?').first().waitFor({ timeout: 5000 }); });
+await step('shabbat card only Wed → Fri 20:00', async () => {
+  const d = new Date(), want = d.getDay() === 3 || d.getDay() === 4 || (d.getDay() === 5 && d.getHours() < 20);
+  const href = await page.locator('a.shabbat-card').getAttribute('href', { timeout: 1000 }).catch(() => null);
+  if (want ? href !== '#/shabbat' : href !== null) throw new Error(`day ${d.getDay()}: ${href}`);
+});
 await step('home shows overdue/expiry/restock', async () => {
   const t = await text();
   for (const s of ['הוצאת זבל', 'חלב 3%', 'כדאי לקנות', 'עגבנייה', 'ביצים']) if (!t.includes(s)) throw new Error('missing ' + s);
@@ -300,6 +305,29 @@ await step('recipe site standalone', async () => {
   await page.waitForTimeout(200);
   if ((await page.locator('.rcard').count()) < 2) throw new Error('search');
   await shot('9-site');
+});
+await step('shabbat: seeded challah, step timer + cancel, edit steps, ingredients → list minus what we have', async () => {
+  await page.goto(url + '#/shabbat');
+  await page.getByText('חלה מתוקה ומבריקה').waitFor({ timeout: 4000 });
+  await page.getByRole('button', { name: '⏰ 60 דק׳' }).click();
+  await page.locator('.cd').waitFor({ timeout: 3000 });
+  const [al, rc] = await page.evaluate(() => ['alarm', 'shabbat'].map((m) => window.__db.records.find((r) => r.module === m)));
+  const mins = (Date.parse(al?.data.at) - Date.now()) / 60e3;
+  if (!(mins > 58 && mins <= 60) || al.data.ref !== `${rc.id}:${rc.data.steps[2].id}`) throw new Error(JSON.stringify(al));
+  await shot('10-shabbat');
+  await page.getByRole('button', { name: 'ביטול' }).click();
+  await page.waitForTimeout(300);
+  if (await page.evaluate(() => window.__db.records.some((r) => r.module === 'alarm'))) throw new Error('timer not cancelled');
+  await page.getByRole('button', { name: '✏️ עריכה' }).click();
+  await page.getByRole('spinbutton', { name: 'דקות' }).first().fill('12');
+  await page.getByRole('button', { name: 'שמירה' }).click();
+  await page.getByRole('button', { name: '⏰ 12 דק׳' }).waitFor({ timeout: 3000 });
+  if ((await page.evaluate(() => window.__db.records.find((r) => r.module === 'shabbat').data.steps[0].min)) !== 12) throw new Error('edit not saved');
+  await page.getByRole('button', { name: '🛒 מרכיבים לרשימת קניות' }).click();
+  await page.getByRole('button', { name: 'הוסף חסרים' }).click();
+  await page.waitForTimeout(400);
+  const list = await page.evaluate(() => window.__db.records.filter((r) => r.module === 'shopping' && !r.done).map((r) => r.data.name));
+  if (!list.includes('קמח לבן') || !list.includes('שומשום') || list.includes('שמן') || list.includes('מלח')) throw new Error(list.join(','));
 });
 await step('desktop layout', async () => { await page.setViewportSize({ width: 1280, height: 800 }); await page.goto(url + '#/home'); await page.waitForTimeout(300); await shot('5-desktop'); });
 

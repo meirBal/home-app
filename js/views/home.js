@@ -67,10 +67,13 @@ export async function renderHome(root) {
   const score = [...groupBy(log, (l) => l.created_by)].map(([by, ls]) => [memberName(by) || '?', ls.length]).sort((a, b) => b[1] - a[1]);
   if (!ui.pruned) { ui.pruned = true; records.prune(hid, 'log', new Date(Date.now() - 30 * 864e5).toISOString()).then(() => {}, () => {}); }
 
-  const name = memberName(me);
+  const name = memberName(me), d = new Date(), prep = d.getDay() === 3 || d.getDay() === 4 || (d.getDay() === 5 && d.getHours() < 20);   // Wed → Fri 20:00
   root.replaceChildren(...[
     h('header', { class: 'bar' }, h('h1', {}, `🏠 ${name ? 'שלום ' + name : state.house.name}`),
       h('span', { class: 'hint' }, fmtDate(now))),
+
+    prep && h('a', { class: 'card shabbat-card', href: '#/shabbat' },
+      h('b', {}, '🕯️ הכנות לשבת'), h('span', { class: 'hint' }, 'חלה עם טיימרים · מרכיבים לרשימה ←')),
 
     h('div', { class: 'hero' },
       h('button', { class: 'hero-btn', onclick: guard(async () => (await import('./dice.js')).openDice()) },
