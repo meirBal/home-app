@@ -163,6 +163,12 @@ details.bought .item { margin-top: 6px; }
   @keyframes up { from { transform: translateY(40px); opacity: 0; } }
 }
 
+/* shopping row: − qty + · unit · ✕ ; past purchases as one-tap chips */
+.shopctl { display: flex; align-items: center; gap: 2px; flex: none; }
+.shopctl button { width: 36px; min-height: 36px; padding: 0; } .shopctl .qv { min-width: 28px; text-align: center; }
+.shopctl select { width: auto; flex: none; padding-inline: 4px; } .ghost.x { color: var(--bad); }
+.chips.sugg { gap: 6px; } .chips.sugg .chip { border: 1px solid var(--line); cursor: pointer; padding: 6px 10px; }
+
 /* shopping catalog: tap name to pick, stepper for quantity */
 .item.cat { gap: 6px; padding: 6px 10px; } .item.cat.sel { border-color: var(--acc); box-shadow: inset 3px 0 0 var(--acc); }
 .item.cat .stepper { gap: 2px; } .item.cat .stepper button { width: 40px; min-height: 40px; }

@@ -50,6 +50,20 @@ export function guess(name) {
   return { cycle: g?.[1] || null, category: g?.[2] || null };
 }
 
+// ---- [Generic groups: tracked as one item, not by brand/flavour — receipt lines and stock collapse into the group] ----
+// [group, pattern, aisle]; groups are bought by mood, so their stock item never nags (cycle 'ללא')
+const NOT_GROUP = /חומץ|כפפות|לאפייה|סויה|שיבולת/;
+const GROUPS = [
+  ['אלכוהול', W('בירה|יין|יינות|וודקה|ויסקי|ערק|ליקר|גולדסטאר|קרלסברג|היינקן|טובורג|קורונה|פאולנר|ויינשטפן'), 'משקאות'],
+  ['שתייה מתוקה', W('קוקה|קולה|פפסי|ספרייט|פאנטה|ספרינג|גאמפ|פריגת|תפוזינה|שוופס|נסטי|אייס(?!ברג)|מיץ'), 'משקאות'],
+  ['ממתקים ושוקולד', W('שוקולד|קרמבו|סוכרי|מסטיק|וופל|פסק זמן|קינדר|טופי|מרשמלו|ממתק|לוטוס|עוגיות|מנצס'), 'יבשים ושימורים'],
+  ['חטיפים', W("במבה|ביסלי|צ'יפס|צ׳יפס|תפוצ|דוריטוס|אפרופו|בייגלה|פופקורן|חטיף|קליק|פרינגלס|ציטוס|פינוקים"), 'יבשים ושימורים'],
+];
+export function groupOf(name) {
+  const n = norm(name), g = GROUPS.find(([k]) => k === n) || (!NOT_GROUP.test(n) && GROUPS.find(([, re]) => re.test(n)));
+  return g ? { name: g[0], category: g[2] } : null;
+}
+
 // ---- [Product state] ----
 export function expiry(p, now = today()) {
   if (!p.due) return null;
@@ -99,10 +113,20 @@ export async function setStatus(p, status) {
   }
 }
 
+// "Don't suggest again": product stops nagging (no cycle, empty/low status cleared). Returns the muted product or null.
+export async function mute(name, prods) {
+  const t = tokens(name), p = prods.find((x) => similar(x._t ||= tokens(x.data?.name), t));
+  if (!p) return null;
+  const patch = { cycle: 'ללא', ...(['נגמר', 'נמוך'].includes(p.data?.status) && { status: '' }) };
+  await records.patch(p.id, patch);
+  Object.assign(p.data, patch);
+  return p;
+}
+
 // Bought (shopping ✓ or receipt) → product restocked, or created with guessed cycle/category.
 // `known` = full product list (fetched once per batch); fuzzy match "חלב 3% תנובה" → "חלב"; kept up to date.
 export async function restock({ name, qty, unit, price, category }, known) {
-  const hid = state.house.id, n = norm(name), now = today();
+  const hid = state.house.id, grp = groupOf(name), n = grp?.name || norm(name), now = today();
   if (!n || !state.modules.some((m) => m.id === 'products' && m.enabled !== false)) return false;
   known ||= await records.all(hid, 'products');
   const t = tokens(n), p = known.find((x) => similar(x._t ||= tokens(x.data?.name), t));
@@ -115,7 +139,7 @@ export async function restock({ name, qty, unit, price, category }, known) {
     return true;
   }
   const g = guess(n);
-  const data = { name: n, category: category || g.category, cycle: g.cycle || 'ללא', ...patch };
+  const data = { name: n, category: grp?.category || category || g.category, cycle: (!grp && g.cycle) || 'ללא', ...patch };
   const row = await records.insert({ household_id: hid, module: 'products', amount: amount ?? null, data });
   known.push({ id: row.id, data, _t: t });
   return true;

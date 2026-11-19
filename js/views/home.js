@@ -2,7 +2,7 @@
 import { h, guard, toast, fmtDate, chipText, memberName, today, DICE_SVG, groupBy } from '../core/ui.js';
 import { records } from '../core/api.js';
 import { TASK_MODULES } from '../core/modules.js';
-import { completeTask, skipTask, expiry, needsRestock, addToShopping, norm, warrantyState } from '../core/smart.js';
+import { completeTask, skipTask, expiry, needsRestock, addToShopping, norm, warrantyState, mute } from '../core/smart.js';
 import { packs, packRows } from '../data/seeds.js';
 import { state } from '../core/state.js';
 
@@ -104,7 +104,9 @@ export async function renderHome(root) {
     restock.length > 0 && section('🛒 כדאי לקנות',
       h('div', { class: 'list' }, ...restock.map((p) => h('label', { class: 'item' },
         h('input', { type: 'checkbox', checked: true, onchange: (e) => (e.target.checked ? picks.add(p.id) : picks.delete(p.id)) }),
-        h('span', { class: 'grow' }, p.data?.name), h('span', { class: 'chip soon' }, why[needsRestock(p, now)])))),
+        h('span', { class: 'grow' }, p.data?.name), h('span', { class: 'chip soon' }, why[needsRestock(p, now)]),
+        h('button', { type: 'button', class: 'ghost x', 'aria-label': `לא להציע ${p.data?.name}`, title: 'לא להציע שוב',
+          onclick: busy(async (e) => { e.preventDefault(); await mute(p.data.name, prods); picks.delete(p.id); toast(`"${p.data.name}" לא יוצע יותר`); state.refresh(); }) }, '✕')))),
       h('button', { onclick: busy(async () => {
         const n = await addToShopping(restock.filter((p) => picks.has(p.id)).map((p) => ({ name: p.data.name, unit: p.data.unit })));
         toast(`נוספו ${n} פריטים לרשימת הקניות`); state.refresh();

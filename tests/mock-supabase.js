@@ -68,6 +68,8 @@ export function createClient() {
       { name: 'חלב 3% תנובה', qty: 2, unit: 'ליטר', price: 13.8, category: 'מוצרי חלב' },
       { name: 'לחם אחיד', qty: 1, unit: 'יח׳', price: 8.7, category: 'מאפים' },
       { name: 'מרכך כביסה', qty: 1, unit: 'יח׳', price: 20, category: 'ניקיון' },
+      { name: 'במבה אסם 80 גרם', qty: 1, unit: 'יח׳', price: 4.9, category: 'אחר', promo: '2 ב 8' },
+      { name: 'ביסלי גריל', qty: 1, unit: 'יח׳', price: 3.1, category: 'אחר' },
       { name: 'מיחם חשמלי', qty: 1, unit: 'יח׳', price: 150, category: 'כלי בית', durable: true, warranty_months: 12 }] }, error: null }) },
   };
 }

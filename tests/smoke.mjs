@@ -14,7 +14,7 @@ const srv = http.createServer((q, s) => {
 const url = `http://127.0.0.1:${srv.address().port}/`;
 
 const errors = [];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
@@ -110,6 +110,7 @@ await step('receipt review + apply', async () => {
   await chooser.setFiles({ name: 'r.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64') });
   await page.getByRole('button', { name: 'אישור ועדכון' }).waitFor({ timeout: 4000 });
   await shot('4-receipt');
+  await page.locator('dialog .item.rc', { hasText: '2 שורות' }).getByText('🏷️ 2 ב 8').waitFor({ timeout: 2000 });   // snacks → one group line
   await page.getByRole('button', { name: 'אישור ועדכון' }).click();
   await page.waitForTimeout(500);
   const r = await page.evaluate(() => ({
@@ -118,7 +119,9 @@ await step('receipt review + apply', async () => {
     exp: window.__db.records.find((x) => x.module === 'expenses')?.amount,
     war: window.__db.records.filter((x) => x.module === 'warranty').map((x) => [x.data.months, !!x.due, !!x.data.receipt]),
     urn: window.__db.records.some((x) => x.module === 'products' && x.data.name.includes('מיחם')),
+    snacks: window.__db.records.filter((x) => x.module === 'products' && /חטיפים|במבה|ביסלי/.test(x.data.name)).map((x) => [x.data.name, x.data.qty, x.data.cycle, x.amount]),
   }));
+  if (JSON.stringify(r.snacks) !== '[["חטיפים",2,"ללא",8]]') throw new Error('group ' + JSON.stringify(r.snacks));
   if (r.milk.length !== 1 || !r.bread || r.exp !== 192.5 || JSON.stringify(r.war) !== '[[12,true,true]]' || r.urn) throw new Error(JSON.stringify(r));
 });
 await step('digital receipt (.mht, quoted-printable) → text to AI', async () => {
@@ -169,6 +172,40 @@ await step('share target: shared file and shared text open the scan', async () =
   await page.goto(url + '#/share');
   await page.getByText(/קישור לבד לא מספיק/).waitFor({ timeout: 3000 });
   if (await page.evaluate(async () => !!(await (await caches.open('share')).match('text')))) throw new Error('share not cleared');
+});
+await step('shopping row: −/+ qty, unit, ✕ with "don\'t suggest again", past-purchase suggestions', async () => {
+  await page.goto(url + '#/shopping');
+  const db = (f) => page.evaluate(f);
+  if (!(await db(() => window.__db.records.some((x) => x.module === 'shopping' && !x.done && x.data.name === 'ביצים')))) {
+    await page.locator('form.quick input').fill('ביצים'); await page.locator('form.quick input').press('Enter'); await page.waitForTimeout(300);
+  }
+  await page.getByRole('button', { name: 'עוד ביצים' }).click();
+  await page.getByRole('button', { name: 'עוד ביצים' }).click();
+  await page.getByRole('combobox', { name: 'יחידה ביצים' }).selectOption('אריזה');
+  await page.waitForTimeout(800);
+  const row = await db(() => window.__db.records.find((x) => x.module === 'shopping' && !x.done && x.data.name === 'ביצים')?.data);
+  if (row?.unit !== 'אריזה' || !(row.qty >= 2)) throw new Error('qty/unit ' + JSON.stringify(row));
+  await shot('8-shop-row');
+  await page.getByRole('button', { name: 'הסרה ביצים' }).click();
+  await page.getByRole('button', { name: 'לא להציע שוב' }).click();
+  await page.waitForTimeout(300);
+  const st = await db(() => [window.__db.records.some((x) => x.module === 'shopping' && !x.done && x.data.name === 'ביצים'),
+    window.__db.records.find((x) => x.module === 'products' && x.data.name === 'ביצים')?.data.cycle]);
+  if (st[0] || st[1] !== 'ללא') throw new Error('drop/mute ' + JSON.stringify(st));
+  await page.goto(url + '#/shopping');
+  await page.getByText('⭐ מומלצים — נקנו בעבר').waitFor({ timeout: 3000 });
+  await page.getByRole('button', { name: '+ ביצים' }).click();
+  await page.waitForTimeout(300);
+  if (!(await db(() => window.__db.records.some((x) => x.module === 'shopping' && !x.done && x.data.name === 'ביצים')))) throw new Error('suggestion add');
+});
+await step('home "worth buying": ✕ stops suggesting', async () => {
+  await page.evaluate(() => window.__db.records.push({ id: 'cola1', household_id: 'h1', module: 'products', done: false, due: null, amount: null,
+    created_at: new Date().toISOString(), data: { name: 'רוטב צ׳ילי', status: 'נגמר', cycle: 'כל חודש' } }));
+  await page.goto(url + '#/home');
+  const name = 'רוטב צ׳ילי', x = page.getByRole('button', { name: 'לא להציע ' + name });
+  await x.click(); await page.waitForTimeout(300);
+  const c = await page.evaluate((n) => window.__db.records.find((r) => r.module === 'products' && r.data.name === n)?.data.cycle, name);
+  if (c !== 'ללא' || (await page.getByRole('button', { name: 'לא להציע ' + name }).count())) throw new Error('home mute ' + name + ' ' + c);
 });
 await step('more grid + admin', async () => {
   await page.goto(url + '#/more'); await page.getByText('כל האזורים').waitFor();

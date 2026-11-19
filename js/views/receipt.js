@@ -1,7 +1,7 @@
 // ===== RECEIPT SCAN 🧾 — photo/PDF/digital receipt (.mht/.html) → AI items → review → stock + shopping list + expense + warranty cards =====
 import { h, guard, modal, toast, today, fmtMoney } from '../core/ui.js';
 import { records, photos, fn, isPdf } from '../core/api.js';
-import { restock, similar, warrantyEnd } from '../core/smart.js';
+import { restock, similar, warrantyEnd, groupOf } from '../core/smart.js';
 import { UNITS, WARRANTY_CATS } from '../core/modules.js';
 import { state } from '../core/state.js';
 
@@ -97,9 +97,23 @@ const unitOf = (u) => {
 };
 
 function review(res, file) {
-  const rows = res.items.map((it) => ({ on: true, name: it.name, qty: it.qty ?? null, unit: unitOf(it.unit),
-    price: typeof it.price === 'number' && it.price >= 0 ? it.price : null, category: it.category,
-    durable: !!it.durable, months: +it.warranty_months > 0 ? Math.round(+it.warranty_months) : 0 }));
+  const rows = [], groups = new Map();
+  for (const it of res.items) {
+    const r = { on: true, name: it.name, qty: it.qty ?? null, unit: unitOf(it.unit),
+      price: typeof it.price === 'number' && it.price >= 0 ? it.price : null, category: it.category, promos: it.promo?.trim() ? [it.promo.trim()] : [],
+      durable: !!it.durable, months: +it.warranty_months > 0 ? Math.round(+it.warranty_months) : 0 };
+    // generic groups (snacks, sweets, sweet drinks, alcohol): one line — how many, total paid, which deals applied
+    const g = !r.durable && !r.months && groupOf(r.name);
+    if (!g) { rows.push(r); continue; }
+    let m = groups.get(g.name);
+    if (!m) {
+      m = { ...r, name: g.name, category: g.category, qty: 0, unit: 'יח׳', price: null, src: [], promos: [] };
+      groups.set(g.name, m); rows.push(m);
+    }
+    m.src.push(r.name); m.promos.push(...r.promos);
+    m.qty += Number.isInteger(r.qty) && r.qty > 0 ? r.qty : 1;                          // weighed sweets count as one
+    if (r.price != null) m.price = Math.round(((m.price || 0) + r.price) * 100) / 100;
+  }
   // the AI sometimes misreads the total (e.g. picks a sub-line): trust it only near the item sum
   const sum = Math.round(rows.reduce((s, r) => s + (r.price || 0), 0) * 100) / 100;
   const total = res.total > 0 && (!sum || Math.abs(res.total - sum) <= sum * 0.3) ? +res.total : sum;
@@ -112,6 +126,8 @@ function review(res, file) {
     h('input', { class: 'num', type: 'number', inputMode: 'decimal', step: 'any', value: r.qty ?? '', 'aria-label': 'כמות',
       oninput: (e) => (r.qty = e.target.value === '' ? null : +e.target.value) }),
     h('span', { class: 'chip' }, r.unit), r.price != null && h('span', { class: 'chip' }, fmtMoney(r.price)),
+    r.src && h('span', { class: 'chip', title: r.src.join('\n') }, `${r.src.length} שורות`),
+    r.promos.length > 0 && h('span', { class: 'chip ok', title: r.promos.join('\n') }, `🏷️ ${r.promos[0]}${r.promos.length > 1 ? ` +${r.promos.length - 1}` : ''}`),
     r.months ? h('span', { class: 'chip', title: 'אחריות' }, `🛡️ ${r.months}ח׳`) : r.durable && h('span', { class: 'chip', title: 'לא מתכלה — לא נכנס למלאי' }, '🏠'));
   const check = (k, label) => h('label', { class: 'inline' },
     h('input', { type: 'checkbox', checked: opt[k], onchange: (e) => (opt[k] = e.target.checked) }), label);
@@ -148,7 +164,7 @@ async function apply(items, res, total, opt, file) {
   let marked = 0;
   if (opt.list) {
     const open = await records.open(hid, 'shopping');
-    const hits = open.filter((o) => items.some((it) => similar(o.data?.name, it.name)));
+    const hits = open.filter((o) => items.some((it) => [it.name, ...(it.src || [])].some((n) => similar(o.data?.name, n))));
     await Promise.all(hits.map((o) => records.update(o.id, { done: true })));
     marked = hits.length;
   }
