@@ -3,7 +3,7 @@ import { h, toast, DICE_SVG } from '../core/ui.js';
 import { records } from '../core/api.js';
 import { addToShopping, tokens, similar } from '../core/smart.js';
 import { state } from '../core/state.js';
-import { renderBrowser, renderRecipe, loadRecipe } from '../../recipes/lib.js';
+import { renderBrowser, renderRecipe, loadRecipe, SHABBAT } from '../../recipes/lib.js';
 
 export const STAPLES = ['מלח', 'פלפל שחור', 'שמן', 'מים', 'סוכר', 'שמן זית', 'מלח ופלפל', 'מלח ופלפל שחור'].map(tokens);
 export const isStaple = (name) => STAPLES.some((t) => similar(t, name)) || /^~?\s*(מלח|שמן לטיגון)/.test(name);
@@ -23,9 +23,10 @@ let cleanup;
 export async function renderLibrary(root, id) {
   cleanup?.(); cleanup = null;
   const have = await stockMatcher();
-  if (!id) {
+  if (!id || id === 'shabbat') {                       // #/library/shabbat = the "לשבת קודש" collection
     const box = h('div');
     await renderBrowser(box, {
+      cat: id && SHABBAT,
       onOpen: (rid) => (location.hash = `#/library/${rid}`),
       score: (r) => { const need = r.i.filter((n) => !isStaple(n)); return { need: need.length, have: need.filter(have).length }; },
     });

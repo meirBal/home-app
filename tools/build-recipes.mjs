@@ -129,9 +129,12 @@ fs.mkdirSync(OUT, { recursive: true });
 for (const f of fs.readdirSync(OUT)) if (f.startsWith('batch-')) fs.rmSync(path.join(OUT, f));   // LOG.md is kept
 const byBatch = Map.groupBy(all, (r) => r.batch);
 for (const [b, rs] of byBatch) fs.writeFileSync(path.join(OUT, `batch-${b}.json`), JSON.stringify(rs.map(({ batch, ...r }) => r)));
+const SHABBAT_TAGS = ['שבת', 'מתאים לשבת', 'סלטים לשבת'];
+if (all.some((r) => r.id === 'shabbat')) throw new Error("recipe id 'shabbat' is reserved (#/library/shabbat)");
 // compact index: enough for search, filters and stock matching; full recipe loads on open
 const index = all.map((r) => ({ id: r.id, n: r.name, c: r.cat, m: r.meals.join(''), h: r.hunger.join(''), k: r.kosher,
-  d: r.difficulty, t: r.prep + r.cook, s: r.servings, i: r.ingredients.map((x) => x.name), b: r.batch }));
+  d: r.difficulty, t: r.prep + r.cook, s: r.servings, i: r.ingredients.map((x) => x.name), b: r.batch,
+  ...(r.tags.some((t) => SHABBAT_TAGS.includes(t)) && { sh: 1 }) }));   // "לשבת קודש" collection (not 'שבת בבוקר': mostly cooked fresh)
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index));
 const cnt = (k) => Object.entries(Object.groupBy(all, (r) => r[k])).map(([a, b]) => `${a}:${b.length}`).join(' ');
 console.log(`✓ ${all.length} מתכונים ב-${byBatch.size} קבצים · ${cnt('kosher')} · ${cnt('cat')}`);

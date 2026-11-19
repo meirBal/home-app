@@ -119,6 +119,7 @@ export async function renderShabbat(root) {
     }) }, 'שמירה')]);
   }
 
-  root.replaceChildren(h('header', { class: 'bar' }, h('h1', {}, '🕯️ הכנות לשבת')), body);
+  root.replaceChildren(h('header', { class: 'bar' }, h('h1', {}, '🕯️ הכנות לשבת'),
+    h('a', { class: 'btn ghost', href: '#/library/shabbat' }, '📚 מתכונים לשבת קודש')), body);
   paint();
 }

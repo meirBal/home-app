@@ -55,10 +55,11 @@ const badge = (r) => el('span', { class: `chip ${KOSHER_CLS[r.k || r.kosher]}` }
 const dots = (d) => el('span', { class: 'chip', title: DIFF[d] }, '●'.repeat(d) + '○'.repeat(3 - d) + ' ' + DIFF[d]);
 
 // ---- [Browser: search + filters + list] ----
+export const SHABBAT = '🕯️ לשבת קודש';               // collection: recipes tagged שבת (index flag sh), shown first in the category list
 // opts: { onOpen(id), score?(indexRow) → {have, need} for "what can I cook now" }
 export async function renderBrowser(root, opts = {}) {
   const all = await loadIndex();
-  const st = { q: '', meal: '', k: '', d: '', t: '', c: '', limit: 40, sort: opts.score ? 'have' : '' };
+  const st = { q: '', meal: '', k: '', d: '', t: '', c: opts.cat || '', limit: 40, sort: opts.score ? 'have' : '' };
   const cats = [...new Set(all.map((r) => r.c))];
   const list = el('div', { class: 'list' });
   const scored = opts.score ? new Map(all.map((r) => [r.id, opts.score(r)])) : null;
@@ -75,7 +76,7 @@ export async function renderBrowser(root, opts = {}) {
     const q = st.q.trim();
     let rs = all.filter((r) => (!q || r.n.includes(q) || r.i.some((x) => x.includes(q)))
       && (!st.meal || r.m.includes(st.meal)) && (!st.k || r.k === st.k) && (!st.d || r.d === +st.d)
-      && (!st.t || r.t <= +st.t) && (!st.c || r.c === st.c));
+      && (!st.t || r.t <= +st.t) && (!st.c || (st.c === SHABBAT ? r.sh : r.c === st.c)));
     if (scored && st.sort === 'have') rs = [...rs].sort((a, b) => ratio(b) - ratio(a));
     list.replaceChildren(...[...rs.slice(0, st.limit).map(card),
       rs.length > st.limit && el('button', { class: 'ghost', onclick: () => { st.limit += 40; paint(); } }, `הצג עוד (${rs.length - st.limit})`),
@@ -98,7 +99,7 @@ export async function renderBrowser(root, opts = {}) {
       chips('meal', MEALS), chips('k', { 'פרווה': 'פרווה', 'חלבי': 'חלבי', 'בשרי': 'בשרי' }),
       chips('d', { 1: 'קל', 2: 'בינוני', 3: 'מאתגר' }), chips('t', { 20: 'עד 20 דק׳', 45: 'עד 45 דק׳', 90: 'עד 90 דק׳' }),
       el('select', { onchange: (e) => { st.c = e.target.value; paint(); } }, el('option', { value: '' }, 'כל הקטגוריות'),
-        ...cats.map((c) => el('option', { value: c }, c)))),
+        ...[SHABBAT, ...cats].map((c) => el('option', { value: c, selected: c === st.c }, c)))),
     count, list);
   paint();
 }

@@ -308,7 +308,7 @@ await step('recipe site standalone', async () => {
 });
 await step('shabbat: seeded challah, step timer + cancel, edit steps, ingredients → list minus what we have', async () => {
   await page.goto(url + '#/shabbat');
-  await page.getByText('חלה מתוקה ומבריקה').waitFor({ timeout: 4000 });
+  await page.getByText('חלות לשבת — רכות ואווריריות').waitFor({ timeout: 4000 });
   await page.getByRole('button', { name: '⏰ 60 דק׳' }).click();
   await page.locator('.cd').waitFor({ timeout: 3000 });
   const [al, rc] = await page.evaluate(() => ['alarm', 'shabbat'].map((m) => window.__db.records.find((r) => r.module === m)));
@@ -328,6 +328,10 @@ await step('shabbat: seeded challah, step timer + cancel, edit steps, ingredient
   await page.waitForTimeout(400);
   const list = await page.evaluate(() => window.__db.records.filter((r) => r.module === 'shopping' && !r.done).map((r) => r.data.name));
   if (!list.includes('קמח לבן') || !list.includes('שומשום') || list.includes('שמן') || list.includes('מלח')) throw new Error(list.join(','));
+  await page.getByRole('link', { name: '📚 מתכונים לשבת קודש' }).click();         // the "לשבת קודש" collection
+  await page.locator('.rcard').first().waitFor({ timeout: 5000 });
+  const [n, sel] = [await page.locator('.hint', { hasText: 'מתכונים' }).last().innerText(), await page.locator('.filters select').inputValue()];
+  if (sel !== '🕯️ לשבת קודש' || !(parseInt(n) > 100 && parseInt(n) < 400)) throw new Error(`${sel} ${n}`);
 });
 await step('desktop layout', async () => { await page.setViewportSize({ width: 1280, height: 800 }); await page.goto(url + '#/home'); await page.waitForTimeout(300); await shot('5-desktop'); });
 
