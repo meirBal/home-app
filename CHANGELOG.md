@@ -1,3 +1,7 @@
+## 1.9.0 — 2026-11-19
+- Shabbat prep 🕯️: challah recipe with editable steps/ingredients; ⏰ per step = alarm pushed by the server (rings with the app closed); ingredients → shopping list with 'have it' check; home card Wed→Fri 20:00; shopping categories fixed (olives, snacks); 12 review fixes
+- previous: v1.8.0 (rollback: scripts/rollback.sh 1.8.0)
+
 ## 1.8.0 — 2026-11-19
 - Shopping list: −/+ quantity, unit picker and ✕ (with undo) on every row; 'recommended — bought before' section; snacks and sweet drinks stocked as one group product; purchase cycles learned from real repeat buys (no more one-off items stuck as recurring); 11 review fixes
 - previous: v1.7.0 (rollback: scripts/rollback.sh 1.7.0)
