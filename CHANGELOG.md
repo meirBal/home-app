@@ -1,3 +1,7 @@
+## 1.8.0 — 2026-11-19
+- Shopping list: −/+ quantity, unit picker and ✕ (with undo) on every row; 'recommended — bought before' section; snacks and sweet drinks stocked as one group product; purchase cycles learned from real repeat buys (no more one-off items stuck as recurring); 11 review fixes
+- previous: v1.7.0 (rollback: scripts/rollback.sh 1.7.0)
+
 ## 1.7.0 — 2026-11-05
 - Forgot password: reset email from the login screen, new-password screen when opening the email link
 - previous: v1.6.1 (rollback: scripts/rollback.sh 1.6.1)
