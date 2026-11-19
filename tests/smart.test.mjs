@@ -2,15 +2,18 @@
 import fs from 'node:fs';
 const src = fs.readFileSync(new URL('../js/core/smart.js', import.meta.url), 'utf8');
 const pure = src.slice(src.indexOf('export const norm'), src.indexOf('// ---- [Product state] ----'));
-const { similar, guess } = await import('data:text/javascript,' + encodeURIComponent(pure));
+const { similar, guess, groupOf } = await import('data:text/javascript,' + encodeURIComponent(pure));
 let bad = 0;
 const eq = (got, want, label) => { if (got !== want) { bad++; console.log('✗', label, got, '≠', want); } };
 for (const [a, b, e] of [['חלב', 'חלב 3% תנובה', true], ['חלב', 'שוקולד חלב', false], ['עגבנייה', 'רסק עגבניות', false],
   ['ביצה', 'ביצים L', true], ['חלב', 'חלבה', false], ['לחם', 'פירורי לחם', false], ['תפוחי אדמה', 'תפוח אדמה', true],
   ['גבינה', 'גבינה צהובה 28%', true], ['דג', 'דגני בוקר', false], ['עגבניות', 'עגבנייה', true]]) eq(similar(a, b), e, `${a}|${b}`);
 for (const [n, cat] of [['מרכך כביסה', 'ניקיון'], ['מרכך שיער', 'טואלטיקה'], ['נוזל כלים לימון', 'ניקיון'], ['שמנת מתוקה', 'מוצרי חלב'],
-  ['שמן קנולה', 'יבשים ושימורים'], ['פלפל שחור', 'יבשים ושימורים'], ['פלפל אדום', 'ירקות ופירות'], ['קרמבו', null],
+  ['שמן קנולה', 'יבשים ושימורים'], ['פלפל שחור', 'יבשים ושימורים'], ['פלפל אדום', 'ירקות ופירות'], ['קרמבו', 'חטיפים ומתוקים'],
   ['חמאת בוטנים', null], ['דגני בוקר', 'יבשים ושימורים'], ['קולה ללא סוכר', 'משקאות']]) eq(guess(n).category, cat, n);
+for (const [n, g] of [['במבה אסם 80 גרם', 'חטיפים'], ['שוקולד פרה מריר 4*100', 'חטיפים'], ['קרמבו מוקה שטראוס 8', 'חטיפים'], ['מארז קוקה קולה 6*1.5', 'שתייה מתוקה'],
+  ['גאמפ ענבים 1.5 ליטר', 'שתייה מתוקה'], ['חלב 3% תנובה', undefined], ['משקה סויה ללא תוספת', undefined], ['קמח לבן', undefined], ["שוקולד צ'יפס לאפייה", undefined], ['ממרח לוטוס', undefined], ['גלידה שוקולד', undefined]]) eq(groupOf(n)?.name, g, 'group: ' + n);
+eq(guess('במבה').category, 'חטיפים ומתוקים', 'group aisle');
 const { BASICS } = await import('../js/data/seeds.js');            // every catalog basic lands in a real aisle
 for (const [n] of BASICS) eq(!!guess(n).category, true, 'aisle: ' + n);
 console.log(bad ? `${bad} failed` : 'all passed'); process.exit(bad ? 1 : 0);

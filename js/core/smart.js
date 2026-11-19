@@ -44,10 +44,21 @@ const GUESS = [
   [W('עוף|בשר|פילה|סלמון|נקניק|שניצל|כרעיים|חזה|קציצות|המבורגר'), 'כל שבוע', 'בשר ודגים'],
   [Wf('דג|דגים'), 'כל שבוע', 'בשר ודגים'],
 ];
+// Groups: brand doesn't matter → stocked as one product ("במבה", "שוקולד פרה" → "חטיפים"); the receipt still lists each line
+const GROUPS = [
+  [W("במבה|ביסלי|צ'יפס|ציפס|תפוצ'יפס|דוריטוס|צ'יטוס|אפרופו|בייגלה|חטיף|פופקורן|שוקולד|קרמבו|וופל|סוכרי|מסטיק|ממתק|מנטוס|לוטוס|פסק זמן|קליק|כיף כף|מקופלת"), 'חטיפים', 'חטיפים ומתוקים'],
+  [W('קולה|קוקה|פפסי|פאנטה|ספרייט|ספרינג|גאמפ|פריגת|תפוזינה|נביעות טעם|אייס קפה|רד בול|משקה אנרגיה'), 'שתייה מתוקה', 'משקאות'],
+];
+const NOT_GROUP = /לאפי|ממרח|גלידה|פודינג|דגני|קפוא|קרם/;           // baking, spreads, frozen: real items, not snacks
+export const groupOf = (name) => {
+  const n = norm(name), g = !NOT_GROUP.test(n) && GROUPS.find(([re]) => re.test(n));
+  return g ? { name: g[1], category: g[2] } : null;
+};
+
 export function guess(name) {
   const n = norm(name);
   const g = !NOT_GUESSABLE.test(n) && GUESS.find(([re]) => re.test(n));
-  return { cycle: g?.[1] || null, category: g?.[2] || null };
+  return { cycle: g?.[1] || null, category: g?.[2] || groupOf(n)?.category || null };
 }
 
 // ---- [Product state] ----
@@ -101,21 +112,31 @@ export async function setStatus(p, status) {
 
 // Bought (shopping ✓ or receipt) → product restocked, or created with guessed cycle/category.
 // `known` = full product list (fetched once per batch); fuzzy match "חלב 3% תנובה" → "חלב"; kept up to date.
+// The cycle is learned from the real gap between two purchases (never guessed from one) — a one-off buy doesn't recur.
+const learnCycle = (from, to) => {
+  const d = (new Date(to) - new Date(from)) / 864e5;
+  if (!(d >= 2 && d <= 120)) return null;
+  return Object.entries(CYCLE_DAYS).reduce((a, b) => (Math.abs(Math.log(d / b[1])) < Math.abs(Math.log(d / a[1])) ? b : a))[0];
+};
 export async function restock({ name, qty, unit, price, category }, known) {
-  const hid = state.house.id, n = norm(name), now = today();
-  if (!n || !state.modules.some((m) => m.id === 'products' && m.enabled !== false)) return false;
+  const hid = state.house.id, now = today();
+  if (!norm(name) || !state.modules.some((m) => m.id === 'products' && m.enabled !== false)) return false;
   known ||= await records.all(hid, 'products');
-  const t = tokens(n), p = known.find((x) => similar(x._t ||= tokens(x.data?.name), t));
+  const find = (t) => known.find((x) => similar(x._t ||= tokens(x.data?.name), t));
+  const grp = !find(tokens(name)) && groupOf(name);                      // an existing own product wins over its group
+  if (grp) ({ name, category } = grp), qty = unit = price = undefined;    // group: no brand, quantity or per-item price
+  const n = norm(name), t = tokens(n), p = find(t);
   const num = Number(qty);
   const patch = { status: 'מלא', bought: now, ...(qty != null && qty !== '' && Number.isFinite(num) && { qty: num }), ...(unit && { unit }) };
   const amount = price != null && price !== '' && Number.isFinite(+price) ? +price : undefined;
   if (p) {
+    const cyc = !p.data?.cycle && p.data?.bought && learnCycle(p.data.bought, now);   // 'ללא' = user chose no cycle
+    if (cyc) patch.cycle = cyc;
     Object.assign(p.data, patch);
     await records.patch(p.id, patch, amount);
     return true;
   }
-  const g = guess(n);
-  const data = { name: n, category: category || g.category, cycle: g.cycle || 'ללא', ...patch };
+  const data = { name: n, category: category || guess(n).category, ...patch };      // no cycle until learned
   const row = await records.insert({ household_id: hid, module: 'products', amount: amount ?? null, data });
   known.push({ id: row.id, data, _t: t });
   return true;

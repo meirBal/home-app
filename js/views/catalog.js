@@ -2,12 +2,11 @@
 import { h, guard, modal, toast, groupBy } from '../core/ui.js';
 import { records } from '../core/api.js';
 import { addToShopping, tokens, similar, guess, norm, needsRestock } from '../core/smart.js';
-import { CATEGORIES, UNITS } from '../core/modules.js';
+import { CATEGORIES, UNITS, UNIT_STEP as STEP } from '../core/modules.js';
 import { BASICS } from '../data/seeds.js';
 import { state } from '../core/state.js';
 
 const aisle = (c) => (CATEGORIES.includes(c) ? c : 'אחר');
-const STEP = { 'ק״ג': 0.5, 'ליטר': 0.5, 'גרם': 100, 'מ״ל': 100 };            // others: 1
 const step = (e) => STEP[e.unit] || 1;
 
 // rows = shopping rows on screen (their open items are the list), prods = products module rows

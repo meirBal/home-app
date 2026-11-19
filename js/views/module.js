@@ -2,8 +2,8 @@
 import { h, guard, modal, buildForm, valueOf, fmtDate, fmtMoney, chipText, toast, today, groupBy } from '../core/ui.js';
 import { records, photos, thumbOf, house } from '../core/api.js';
 import { completeTask, afterToggle, setStatus, expiry, needsRestock, guess, addToShopping, norm,
-  warrantyEnd, warrantyState } from '../core/smart.js';
-import { CATEGORIES } from '../core/modules.js';
+  warrantyEnd, warrantyState, tokens, similar, groupOf } from '../core/smart.js';
+import { CATEGORIES, UNITS, UNIT_STEP } from '../core/modules.js';
 import { state } from '../core/state.js';
 import { PAGE } from '../config.js';
 
@@ -83,8 +83,8 @@ export async function renderModule(root, mod) {
   const SKIP = new Set(isProducts ? ['status', 'bought', 'cycle', 'warranty'] : isShop ? ['category'] : isWarranty ? ['bought', 'months', 'serial', 'store'] : []);
 
   function item(r) {
-    const exp = isProducts && expiry(r, now), ws = isWarranty && warrantyState(r, now);
-    const chips = rest.filter((f) => !SKIP.has(f.k) && f.k !== 'unit').map((f) => {
+    const exp = isProducts && expiry(r, now), ws = isWarranty && warrantyState(r, now), ctl = isShop && !r.done;
+    const chips = rest.filter((f) => !SKIP.has(f.k) && f.k !== 'unit' && !(ctl && f.k === 'qty')).map((f) => {
       let t = chipText(f, valueOf(r, f));
       if (t && f.k === 'qty' && r.data?.unit) t += ' ' + r.data.unit;      // "2 ק״ג" as one chip
       if (t && isShop && f.k === 'amount') t = '~' + t;
@@ -94,13 +94,44 @@ export async function renderModule(root, mod) {
     if (isProducts && needsRestock(r, now) === 'cycle') chips.push(h('span', { class: 'chip soon' }, 'כנראה נגמר'));
     if (isProducts && r.data?.warranty) chips.push(h('a', { class: 'chip', href: '#/warranty' }, '🛡️ אחריות'));
     const late = doneF && r.due && !r.done && r.due < now;
-    return h('div', { class: `item${r.done ? ' done' : ''}${late || exp === 'expired' ? ' late' : ''}` },
+    return h('div', { class: `item${r.done ? ' done' : ''}${late || exp === 'expired' ? ' late' : ''}${ctl ? ' shop' : ''}` },
       doneF && h('input', { type: 'checkbox', checked: r.done, 'aria-label': doneF.l,
         onchange: guard(async (e) => { e.target.disabled = true; try { await toggle(r); } finally { e.target.disabled = false; } }) }),
       thumb(r) && h('img', { class: 'thumb', src: thumb(r), alt: '', loading: 'lazy' }),
       h('button', { class: 'body', onclick: () => edit(r) },
         h('strong', {}, String(valueOf(r, main) ?? '')), h('div', { class: 'chips' }, chips)),
-      isProducts && statusBar(r));
+      isProducts && statusBar(r), ctl && shopCtl(r));
+  }
+
+  // ---- [Shopping row: − qty + · unit · ✕ (off the current list, with undo)] — saved in place, no list reload ----
+  function shopCtl(r) {
+    const step = () => UNIT_STEP[r.data?.unit] || 1;
+    const q = h('span', { class: 'qty', 'aria-live': 'polite' }, r.data?.qty ?? '');
+    const save = (p) => {                              // writes chained per row: fast taps can't land out of order
+      Object.assign(r.data, p); q.textContent = r.data.qty ?? '';
+      r._w = (r._w || Promise.resolve()).then(() => records.patch(r.id, p)).catch((e) => { toast(e.message || 'שגיאה', true); state.refresh(); });
+    };
+    const by = (d) => save({ qty: Math.max(step(), Math.round(((+r.data?.qty || 0) + d * step()) * 100) / 100) });
+    return h('div', { class: 'shop-ctl' },
+      h('div', { class: 'stepper' },
+        h('button', { type: 'button', class: 'ghost', 'aria-label': `פחות ${r.data?.name}`, onclick: () => by(-1) }, '−'), q,
+        h('button', { type: 'button', class: 'ghost', 'aria-label': `עוד ${r.data?.name}`, onclick: () => by(1) }, '+')),
+      h('select', { 'aria-label': `יחידה ${r.data?.name}`, onchange: (e) => save({ unit: e.target.value }) },
+        ...UNITS.map((u) => h('option', { value: u, selected: u === (r.data?.unit || 'יח׳') }, u))),
+      h('button', { type: 'button', class: 'ghost', 'aria-label': `הסרה ${r.data?.name}`, onclick: guard(() => remove(r)) }, '✕'));
+  }
+  // ---- [Shopping: recommended from past purchases — ran out / due first, then most recently bought] ----
+  function recommended() {
+    if (!prods || !state.modules.some((m) => m.id === 'products' && m.enabled !== false)) return null;
+    const open = rows.filter((r) => !r.done).map((r) => tokens(groupOf(r.data?.name)?.name || r.data?.name));
+    const recs = prods.filter((p) => p.data?.name && p.data.bought && !open.some((o) => similar(o, p._t ||= tokens(p.data.name))))
+      .map((p) => ({ p, need: needsRestock(p, now) }))
+      .sort((a, b) => !!b.need - !!a.need || b.p.data.bought.localeCompare(a.p.data.bought))
+      .slice(0, 12);
+    return recs.length > 0 && h('section', { class: 'card recs' }, h('h3', { class: 'day' }, '⭐ מומלצים — נקנו בעבר'),
+      h('div', { class: 'rec-list' }, ...recs.map(({ p, need }) => h('button', { type: 'button', class: `rec${need ? ' need' : ''}`,
+        onclick: guard(async () => { await addToShopping([{ name: p.data.name, unit: p.data.unit }], 'עכשיו', prods); buzz(); state.refresh(); }) },
+        '+ ' + p.data.name))));
   }
 
   // Products: one-tap status; empty/low adds to the shopping list. Updates in place (no list reload).
@@ -278,6 +309,7 @@ export async function renderModule(root, mod) {
     rows.length > 8 && h('div', { class: 'row' }, search, mod.view === 'calendar' && h('label', { class: 'inline' },
       h('input', { type: 'checkbox', checked: my.past, onchange: (e) => { my.past = e.target.checked; state.refresh(); } }), 'הצג עבר')),
     list,
+    isShop && recommended(),
     rows.length === PAGE && h('p', { class: 'hint' }, `מוצגים ${PAGE} הפריטים הראשונים`)].filter(Boolean));
   paint();
 

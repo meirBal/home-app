@@ -14,9 +14,10 @@ const photo = { k: 'photo', l: 'תמונה', t: 'photo' };
 export const REPEATS = ['יומי', 'שבועי', 'דו-שבועי', 'חודשי', 'דו-חודשי', 'רבעוני', 'חצי שנתי', 'שנתי'];
 const repeat = { k: 'repeat', l: 'חזרה', t: 'select', o: REPEATS };
 export const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'מ״ל', 'אריזה'];
+export const UNIT_STEP = { 'ק״ג': 0.5, 'ליטר': 0.5, 'גרם': 100, 'מ״ל': 100 };   // −/+ step per unit; others: 1
 const qty = [{ k: 'qty', l: 'כמות', t: 'number' }, { k: 'unit', l: 'יחידה', t: 'select', o: UNITS }];
 // supermarket walking order — the shopping list is grouped in this order
-export const CATEGORIES = ['ירקות ופירות', 'מאפים', 'מוצרי חלב', 'בשר ודגים', 'יבשים ושימורים', 'קפואים',
+export const CATEGORIES = ['ירקות ופירות', 'מאפים', 'מוצרי חלב', 'בשר ודגים', 'יבשים ושימורים', 'חטיפים ומתוקים', 'קפואים',
   'משקאות', 'ניקיון', 'טואלטיקה', 'תינוקות', 'בעלי חיים', 'כלי בית', 'אחר'];
 export const WARRANTY_CATS = ['אלקטרוניקה', 'מוצרי חשמל לבית', 'ריהוט', 'כלי עבודה', 'רכב', 'ביגוד והנעלה', 'אחר'];
 export const CYCLES = ['ללא', 'כל 3 ימים', 'כל שבוע', 'כל שבועיים', 'כל חודש', 'כל חודשיים', 'כל 3 חודשים'];

@@ -170,6 +170,16 @@ details.bought .item { margin-top: 6px; }
 @media (max-width: 360px) { .item.cat .body { flex-basis: 100%; } }
 .catalog .search { position: sticky; top: calc(-1 * var(--gap)); z-index: 2; box-shadow: 0 -12px 0 var(--card); } .item.cat select { width: auto; flex: none; }
 
+/* shopping rows: −/+ qty, unit, ✕; recommendations from past purchases */
+.shop-ctl { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
+.shop-ctl .stepper { gap: 0; padding: 0; } .shop-ctl .stepper button { width: 38px; min-height: 40px; }
+.shop-ctl .qty { min-width: 1.6em; text-align: center; } .shop-ctl select { width: 3.9em; min-height: 40px; padding-inline: 2px; }
+.shop-ctl > button { min-width: 38px; min-height: 40px; padding: 0; color: var(--mute); }
+.item.shop .body { min-width: auto; max-width: 100%; }   /* full name beside the controls, else controls drop below */
+.recs { margin-top: var(--gap); } .rec-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.rec { min-height: 40px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--bg); color: inherit; }
+.rec.need { border-color: var(--acc); color: var(--acc); font-weight: 600; }
+
 /* ===== [7] PERFORMANCE MODES ===== */
 .lite .toast, .lite .roll, .lite .pulse, .lite .modal { animation: none; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }

@@ -14,7 +14,7 @@ const srv = http.createServer((q, s) => {
 const url = `http://127.0.0.1:${srv.address().port}/`;
 
 const errors = [];
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' }).catch(() => chromium.launch());
+const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' }).catch(() => chromium.launch());
 const page = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push('console: ' + m.text()));
@@ -192,6 +192,34 @@ await step('quick add blocks near-duplicates', async () => {
   const n = await page.evaluate(() => window.__db.records.filter((r) => r.module === 'shopping' && !r.done && /^עגבני/.test(r.data.name)).length);
   if (n !== 1) throw new Error('duplicates: ' + n);
 });
+await step('shopping row: −/+, unit, ✕ with undo; group stock; recommendations', async () => {
+  await page.locator('.quick input').fill('במבה');
+  await page.locator('.quick button[type=submit]').click();
+  const row = page.locator('.item', { has: page.locator('strong', { hasText: /^במבה$/ }) });
+  await row.waitFor({ timeout: 3000 });
+  const db = () => page.evaluate(() => window.__db.records.find((r) => r.module === 'shopping' && r.data.name === 'במבה' && !r.done));
+  await row.getByRole('button', { name: 'עוד במבה' }).click(); await row.getByRole('button', { name: 'עוד במבה' }).click();
+  await row.getByRole('button', { name: 'פחות במבה' }).click();
+  await row.getByRole('combobox', { name: 'יחידה במבה' }).selectOption('אריזה');
+  await page.waitForTimeout(200);
+  let r = await db();
+  if (r?.data.qty !== 1 || r.data.unit !== 'אריזה' || (await row.locator('.qty').innerText()) !== '1') throw new Error(JSON.stringify(r?.data));
+  await row.getByRole('button', { name: 'הסרה במבה' }).click();
+  await page.waitForTimeout(300);
+  if (await db()) throw new Error('not removed');
+  await page.getByRole('button', { name: 'ביטול' }).click();
+  await row.waitFor({ timeout: 3000 });
+  await row.locator('input[type=checkbox]').check();                       // bought → stocked as the group
+  await page.waitForTimeout(400);
+  const names = await page.evaluate(() => window.__db.records.filter((x) => x.module === 'products').map((x) => x.data.name));
+  if (!names.includes('חטיפים') || names.includes('במבה')) throw new Error(names.join(','));
+  const recs = await page.locator('.recs .rec').allInnerTexts();             // past purchases not on the list; 'חטיפים' was just bought
+  if (!recs.includes('+ חטיפים') || recs.some((t) => /במבה|מלפפונים/.test(t))) throw new Error(recs.join('|'));
+  await page.locator('.recs .rec', { hasText: 'חטיפים' }).click();
+  await page.waitForTimeout(400);
+  if (!(await page.evaluate(() => window.__db.records.some((x) => x.module === 'shopping' && !x.done && x.data.name === 'חטיפים')))) throw new Error('rec not added');
+  await shot('9-shopping-ctl');
+});
 await step('shopping whatsapp export', async () => {
   await page.evaluate(() => { window.open = (u) => { window.__wa = u; }; });
   await page.getByRole('button', { name: /שליחה בוואטסאפ/ }).click();
@@ -220,7 +248,7 @@ await step('catalog: pick with qty, change existing, add new', async () => {
   await page.waitForTimeout(400);
   const r = await page.evaluate(() => Object.fromEntries(window.__db.records.filter((x) => x.module === 'shopping' && !x.done
     && ['מלפפונים', 'אורז', 'קרמבו'].includes(x.data.name)).map((x) => [x.data.name, [x.data.qty, x.data.unit, x.data.category]])));
-  const want = { 'מלפפונים': [2.5, 'ק״ג', 'ירקות ופירות'], 'אורז': [0.5, 'ק״ג', 'יבשים ושימורים'], 'קרמבו': [1, 'יח׳', 'אחר'] };
+  const want = { 'מלפפונים': [2.5, 'ק״ג', 'ירקות ופירות'], 'אורז': [0.5, 'ק״ג', 'יבשים ושימורים'], 'קרמבו': [1, 'יח׳', 'חטיפים ומתוקים'] };
   if (JSON.stringify(r, Object.keys(want)) !== JSON.stringify(want, Object.keys(want))) throw new Error(JSON.stringify(r));
 });
 await step('product with warranty → prefilled warranty card → end date', async () => {
