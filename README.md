@@ -18,6 +18,7 @@ PWA משפחתית (ללא build, ללא עלות): GitHub Pages + Supabase Free
 | `fonts/` | Rubik מאוחסן מקומית (פרטיות + אופליין), רישיון OFL |
 | `js/views/home.js` | מסך בית: היום ומחר, תוקף, כדאי לקנות, חבילות התחלה |
 | `js/views/dice.js` | 🎲🎲 מתכון לפי ארוחה × רעב × מה שיש בבית (מתוך המאגר + המתכונים שלנו) |
+| `js/views/shabbat.js` | הכנות לשבת: מתכון חלה (js/data/challah.js) עם עריכה, טיימר לכל שלב = התראת push מהשרת (supabase/functions/alarm + sql/003_alarms.sql), מרכיבים לרשימה |
 | `js/views/catalog.js` | קטלוג מוצרים לרשימת הקניות: כל המוצרים המוכרים + בסיס, לפי מעברים, בחירת כמות ויחידה |
 | `js/views/receipt.js` | סריקת קבלה (תמונה, PDF ממוחשב או קבלה דיגיטלית .mht/.html) → אישור → מלאי/קניות/הוצאה/כרטיסי אחריות · שיתוף ישיר מוואטסאפ/SMS/קבצים (share target ב-manifest + sw.js) |
 | `supabase/functions/receipt` | Edge Function: קבלה → פריטים (Gemini, מכסה יומית למשק בית) |
